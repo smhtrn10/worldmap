@@ -1,0 +1,120 @@
+name: Android APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: 🏗 Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 🧹 Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # Remove unnecessary tools and packages
+          tool-cache: true
+          android: false  # Keep Android SDK
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false  # We'll create our own swap
+
+      - name: 🚀 Create Swap Space (Prevent OOM)
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+
+      - name: ⚙️ Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🔧 Install NDK 27
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006" --sdk_root=$ANDROID_HOME
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> $GITHUB_ENV
+
+      - name: 📦 Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: 🔧 Install Expo CLI
+        run: npm install -g @expo/cli@latest
+
+      - name: 🏗 Expo Prebuild (generates android/ + applies plugins)
+        run: npx expo prebuild --platform android --clean --no-install
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: 🔍 Verify ffmpeg-kit patch applied
+        run: |
+          echo "=== ffmpeg-kit build.gradle ==="
+          cat node_modules/ffmpeg-kit-react-native/android/build.gradle | grep -A5 "dependencies {"
+          echo "=== android/libs ==="
+          ls -lh android/libs/ || echo "libs dir empty or missing"
+
+      - name: 🔑 Make Gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: 🧹 Clean Gradle Cache (Free Space)
+        working-directory: android
+        run: |
+          ./gradlew clean
+          rm -rf ~/.gradle/caches/
+          rm -rf ~/.gradle/wrapper/
+          df -h
+
+      - name: 🏗 Build Release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=512m" \
+            -Dorg.gradle.parallel=false
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      - name: 🧹 Clean Build Artifacts (Free Space)
+        working-directory: android
+        run: |
+          # Keep only the final APK, remove intermediate build files
+          find . -type d -name "intermediates" -exec rm -rf {} + || true
+          find . -type d -name "tmp" -exec rm -rf {} + || true
+          df -h
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn

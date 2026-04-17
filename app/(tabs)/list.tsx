@@ -12,12 +12,14 @@ import { Colors } from '@/constants/colors';
 import { fetchAllEvents } from '@/services/api';
 import { useFilters } from '@/context/FilterContext';
 import { useFilteredEvents } from '@/hooks/useFilteredEvents';
+import { useDeviceType } from '@/hooks/useDeviceType';
 import { EventCard } from '@/components/EventCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { FilterChips } from '@/components/FilterChips';
 import type { EventCategory, WorldEvent } from '@/types/events';
 
 export default function ListScreen() {
+  const deviceInfo = useDeviceType();
   const [selectedCategories, setSelectedCategories] = useState<EventCategory[]>([
     'conflict', 'unrest', 'earthquake', 'wildfire', 'flood', 'volcano', 'storm', 'news'
   ]);
@@ -59,11 +61,25 @@ export default function ListScreen() {
 
   const keyExtractor = useCallback((item: WorldEvent) => item.id, []);
 
+  // iPad için grid layout
+  const numColumns = deviceInfo.type === 'tablet' 
+    ? (deviceInfo.isLandscape ? 3 : 2) 
+    : 1;
+
   const ListHeader = (
     <View>
-      <View style={styles.header}>
-        <Text style={styles.title}>Events</Text>
-        <Text style={styles.subtitle}>{visibleEvents.length} events worldwide</Text>
+      <View style={[
+        styles.header,
+        deviceInfo.type === 'tablet' && styles.headerTablet
+      ]}>
+        <Text style={[
+          styles.title,
+          deviceInfo.type === 'tablet' && styles.titleTablet
+        ]}>Events</Text>
+        <Text style={[
+          styles.subtitle,
+          deviceInfo.type === 'tablet' && styles.subtitleTablet
+        ]}>{visibleEvents.length} events worldwide</Text>
       </View>
       <FilterChips
         selectedCategories={selectedCategories}
@@ -89,12 +105,18 @@ export default function ListScreen() {
   return (
     <View style={styles.container}>
       <FlatList
+        key={`list-${numColumns}`} // Force re-render on column change
         data={visibleEvents}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        numColumns={numColumns}
+        columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          deviceInfo.type === 'tablet' && styles.listContentTablet
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -117,20 +139,39 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 24,
   },
+  listContentTablet: {
+    paddingBottom: 40,
+  },
+  columnWrapper: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
   header: {
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 8,
+  },
+  headerTablet: {
+    paddingHorizontal: 32,
+    paddingTop: 80,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: Colors.text,
   },
+  titleTablet: {
+    fontSize: 40,
+  },
   subtitle: {
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 4,
+  },
+  subtitleTablet: {
+    fontSize: 18,
+    marginTop: 8,
   },
   emptyContainer: {
     alignItems: 'center',

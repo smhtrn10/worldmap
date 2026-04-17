@@ -6,6 +6,7 @@ import type { WorldEvent } from '@/types/events';
 import { formatTimeAgo, getCategoryEmoji, getSeverityLabel } from '@/utils/formatters';
 import { BlurView } from 'expo-blur';
 import { useFilters } from '@/context/FilterContext';
+import { useDeviceType } from '@/hooks/useDeviceType';
 import { Lock } from 'lucide-react-native';
 
 interface EventCardProps {
@@ -15,6 +16,7 @@ interface EventCardProps {
 export function EventCard({ event }: EventCardProps) {
   const router = useRouter();
   const { isPro } = useFilters();
+  const deviceInfo = useDeviceType();
   const isLocked = isPro === false && (event.category === 'conflict' || event.category === 'unrest');
 
   const handlePress = useCallback(() => {
@@ -71,18 +73,29 @@ export function EventCard({ event }: EventCardProps) {
       onPress={handlePress}
       style={({ pressed }) => [
         styles.container,
+        deviceInfo.type === 'tablet' && styles.containerTablet,
         pressed && !isLocked && styles.pressed,
         isLocked && styles.lockedContainer,
       ]}
       testID="event-card"
     >
-      <View style={[styles.iconContainer, { backgroundColor: getCategoryColor() + '20' }]}>
-        <Text style={styles.icon}>{getCategoryEmoji(event.category)}</Text>
+      <View style={[
+        styles.iconContainer, 
+        { backgroundColor: getCategoryColor() + '20' },
+        deviceInfo.type === 'tablet' && styles.iconContainerTablet
+      ]}>
+        <Text style={[
+          styles.icon,
+          deviceInfo.type === 'tablet' && styles.iconTablet
+        ]}>{getCategoryEmoji(event.category)}</Text>
       </View>
       
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[
+            styles.title,
+            deviceInfo.type === 'tablet' && styles.titleTablet
+          ]} numberOfLines={2}>
             {isLocked ? '━━━━━━ RESTRICTED ━━━━━━' : event.title}
           </Text>
           {isLocked ? (
@@ -99,10 +112,16 @@ export function EventCard({ event }: EventCardProps) {
         </View>
         
         <View style={styles.footer}>
-          <Text style={styles.location} numberOfLines={1}>
+          <Text style={[
+            styles.location,
+            deviceInfo.type === 'tablet' && styles.locationTablet
+          ]} numberOfLines={1}>
             {isLocked ? 'LOCATION HIDDEN' : (event.location || 'Unknown location')}
           </Text>
-          <Text style={styles.time}>
+          <Text style={[
+            styles.time,
+            deviceInfo.type === 'tablet' && styles.timeTablet
+          ]}>
             {formatTimeAgo(event.timestamp)}
           </Text>
         </View>
@@ -131,6 +150,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  containerTablet: {
+    flex: 1,
+    marginHorizontal: 0,
+    marginVertical: 8,
+    padding: 20,
+  },
   pressed: {
     opacity: 0.8,
     backgroundColor: Colors.cardHover,
@@ -143,8 +168,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  iconContainerTablet: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    marginRight: 16,
+  },
   icon: {
     fontSize: 24,
+  },
+  iconTablet: {
+    fontSize: 28,
   },
   content: {
     flex: 1,
@@ -161,6 +195,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text,
     marginRight: 8,
+  },
+  titleTablet: {
+    fontSize: 17,
   },
   badge: {
     paddingHorizontal: 8,
@@ -183,9 +220,15 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginRight: 8,
   },
+  locationTablet: {
+    fontSize: 15,
+  },
   time: {
     fontSize: 12,
     color: Colors.textMuted,
+  },
+  timeTablet: {
+    fontSize: 14,
   },
   lockedContainer: {
     borderColor: '#FFD70040',

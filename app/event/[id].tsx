@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -23,10 +23,16 @@ import {
   getMarkerColor,
 } from '@/utils/formatters';
 import { MiniMap } from '@/components/MiniMap';
+import { ReviewManager } from '@/utils/reviewManager';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
+  // Event görüntüleme sayısını artır
+  useEffect(() => {
+    ReviewManager.incrementEventsViewed();
+  }, [id]);
 
   const { isPro } = useFilters();
   const { data: events, isLoading } = useQuery({

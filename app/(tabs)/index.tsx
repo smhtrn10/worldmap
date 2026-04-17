@@ -8,6 +8,7 @@ import { useFilters } from '@/context/FilterContext';
 import { useFilteredEvents } from '@/hooks/useFilteredEvents';
 import { RefreshFAB } from '@/components/RefreshFAB';
 import { BottomFilterSheet } from '@/components/BottomFilterSheet';
+import { useDeviceType } from '@/hooks/useDeviceType';
 import type { EventCategory, WorldEvent } from '@/types/events';
 
 // Platform-safe map import - Leaflet only on web, MapLibre on native
@@ -35,6 +36,7 @@ export default function MapScreen() {
   const router = useRouter();
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const { filters, isPro } = useFilters();
+  const deviceInfo = useDeviceType();
 
   // All hooks must be called before any early return
   const disabledCategories: EventCategory[] = isPro ? [] : ['conflict', 'unrest'];
@@ -96,28 +98,57 @@ export default function MapScreen() {
     <View style={styles.container}>
       <MapView events={visibleEvents} onMarkerPress={handleMarkerPress} />
 
-      <View style={styles.topBar}>
-        <Text style={styles.appTitle}>WORLD MONITOR</Text>
+      <View style={[
+        styles.topBar,
+        deviceInfo.type === 'tablet' && styles.topBarTablet
+      ]}>
+        <Text style={[
+          styles.appTitle,
+          deviceInfo.type === 'tablet' && styles.appTitleTablet
+        ]}>WORLD MONITOR</Text>
         <View style={styles.liveBadge}>
           <View style={styles.liveDot} />
           <Text style={styles.liveText}>LIVE</Text>
         </View>
       </View>
 
-      <View style={styles.bottomBar}>
-        <View style={styles.legend}>
+      <View style={[
+        styles.bottomBar,
+        deviceInfo.type === 'tablet' && styles.bottomBarTablet
+      ]}>
+        <View style={[
+          styles.legend,
+          deviceInfo.type === 'tablet' && styles.legendTablet
+        ]}>
           {CATEGORY_LEGEND.map((item) => {
             const isLocked = !isPro && (item.category === 'conflict' || item.category === 'unrest');
             return (
-              <View key={item.category} style={[styles.legendItem, isLocked && { opacity: 0.3 }]}>
-                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
-                <Text style={styles.legendLabel}>{item.label}</Text>
+              <View key={item.category} style={[
+                styles.legendItem, 
+                isLocked && { opacity: 0.3 },
+                deviceInfo.type === 'tablet' && styles.legendItemTablet
+              ]}>
+                <View style={[
+                  styles.legendDot, 
+                  { backgroundColor: item.color },
+                  deviceInfo.type === 'tablet' && styles.legendDotTablet
+                ]} />
+                <Text style={[
+                  styles.legendLabel,
+                  deviceInfo.type === 'tablet' && styles.legendLabelTablet
+                ]}>{item.label}</Text>
               </View>
             );
           })}
         </View>
-        <Pressable style={styles.filterButton} onPress={() => setFilterSheetVisible(true)}>
-          <Text style={styles.filterButtonText}>⚙ FILTER</Text>
+        <Pressable style={[
+          styles.filterButton,
+          deviceInfo.type === 'tablet' && styles.filterButtonTablet
+        ]} onPress={() => setFilterSheetVisible(true)}>
+          <Text style={[
+            styles.filterButtonText,
+            deviceInfo.type === 'tablet' && styles.filterButtonTextTablet
+          ]}>⚙ FILTER</Text>
         </Pressable>
       </View>
 
@@ -142,7 +173,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
+  topBarTablet: {
+    paddingTop: 60,
+    paddingHorizontal: 32,
+    paddingBottom: 16,
+  },
   appTitle: { fontSize: 18, fontWeight: '800', color: '#FFF', letterSpacing: 3, fontFamily: MONO },
+  appTitleTablet: {
+    fontSize: 24,
+    letterSpacing: 4,
+  },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(0,255,100,0.12)', borderWidth: 1, borderColor: '#00FF64',
@@ -155,13 +195,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10,
     backgroundColor: 'rgba(0,0,0,0.65)', gap: 8,
   },
+  bottomBarTablet: {
+    bottom: 32,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    gap: 12,
+  },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  legendTablet: {
+    gap: 16,
+  },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendItemTablet: {
+    gap: 8,
+  },
   legendDot: { width: 10, height: 10, borderRadius: 2 },
+  legendDotTablet: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+  },
   legendLabel: { color: '#CCC', fontSize: 9, fontWeight: '700', letterSpacing: 0.8, fontFamily: MONO },
+  legendLabelTablet: {
+    fontSize: 12,
+    letterSpacing: 1,
+  },
   filterButton: {
     alignSelf: 'flex-end', borderWidth: 1, borderColor: '#00FF6440',
     borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4,
   },
+  filterButtonTablet: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
   filterButtonText: { color: '#00FF64', fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: MONO },
+  filterButtonTextTablet: {
+    fontSize: 14,
+    letterSpacing: 1.5,
+  },
 });

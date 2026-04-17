@@ -22,9 +22,9 @@ export const defaultFilters: FilterSettings = {
 
 export const [FilterProvider, useFilters] = createContextHook(() => {
   const [filters, setFilters] = useState<FilterSettings>(defaultFilters);
-  // K1: false başlangıç değeri — null yerine false, "bilinmiyor" state'i kaldırıldı
-  const [isPro, setIsPro] = useState<boolean>(false);
-  // O1: cache yüklenene kadar true, cache okunur okunmaz false
+  // iPadOS 26 fix: isPro must be nullable for proper loading state
+  const [isPro, setIsPro] = useState<boolean | null>(null);
+  // Loading state tracks cache + RC initialization
   const [isLoading, setIsLoading] = useState(true);
 
   // K1: Tek effect — cache önce, RC live sonra (race condition yok)
@@ -45,7 +45,7 @@ export const [FilterProvider, useFilters] = createContextHook(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // O1: Cache'i okur okumaz isLoading'i kapat — kullanıcı spinner görmez
+  // Load from cache first, then query RevenueCat
   const loadFromCache = useCallback(async () => {
     try {
       const [stored, cachedPro] = await Promise.all([
@@ -62,34 +62,42 @@ export const [FilterProvider, useFilters] = createContextHook(() => {
         });
       }
 
-      if (cachedPro) {
+      // iPadOS 26 fix: Set cached PRO status or default to false
+      if (cachedPro !== null) {
         setIsPro(JSON.parse(cachedPro));
+      } else {
+        setIsPro(false); // Default to free if no cache
       }
     } catch (error) {
       console.error('Error loading cache:', error);
+      setIsPro(false); // Fallback to free on error
     } finally {
       setIsLoading(false);
-      // K1: Cache bittikten SONRA RC'yi sorgula — race condition yok
+      // Query live status after cache is loaded
       void loadLivePro();
     }
   }, []);
 
-  // RC live sorgusu — cache'den sonra çağrılır, AppState'de de tetiklenir
+  // Query live RevenueCat status
   const loadLivePro = useCallback(async () => {
     try {
       const livePro = await RevenueCatService.checkPremiumStatus();
-      // Sorun 1: PRO → FREE geçişinde conflict cache'i temizle
+      // Clear conflict cache if user downgrades to free
       if (!livePro) {
         await AsyncStorage.multiRemove(['@conflict_last_fetch', '@conflict_cached_events']);
       }
       setIsPro(livePro);
       await AsyncStorage.setItem(PRO_STATUS_KEY, JSON.stringify(livePro));
     } catch (error) {
-      // Sorun 2: RC hata alırsa mevcut isPro state'ini koru (setIsPro çağırma)
-      // Ağ yoksa veya RC çökerse kullanıcıyı yanlışlıkla FREE'ye düşürme
+      // iPadOS 26 fix: On error, keep current state (don't force to free)
+      // Only log error, don't update isPro
       console.error('Error checking live PRO status:', error);
+      // If isPro is still null (first load failed), default to false
+      if (isPro === null) {
+        setIsPro(false);
+      }
     }
-  }, []);
+  }, [isPro]);
 
   const updateFilter = useCallback(async <K extends keyof FilterSettings>(
     key: K,

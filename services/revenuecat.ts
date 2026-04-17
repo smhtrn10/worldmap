@@ -13,6 +13,7 @@ let isInitialized = false;
 export const RevenueCatService = {
   /**
    * Initializes the RevenueCat SDK
+   * iPadOS 26 compatible - handles initialization errors gracefully
    */
   async initialize() {
     if (initPromise) return initPromise;
@@ -20,15 +21,24 @@ export const RevenueCatService = {
     initPromise = (async () => {
       try {
         if (Platform.OS !== 'ios') {
+          console.log('[RevenueCat] Skipping initialization - not iOS');
           return;
         }
-        Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-        Purchases.configure({ apiKey: API_KEY_IOS });
-        console.log('[RevenueCat] SDK Initialized for iOS');
+        
+        // iPadOS 26 fix: Wrap configure in try-catch for beta compatibility
+        try {
+          Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+          Purchases.configure({ apiKey: API_KEY_IOS });
+          console.log('[RevenueCat] SDK Initialized for iOS/iPadOS');
+        } catch (configError) {
+          console.error('[RevenueCat] Configuration failed:', configError);
+          throw configError;
+        }
       } catch (e) {
         console.error('[RevenueCat] Initialization failed:', e);
         // Reset so next call can retry
         initPromise = null;
+        throw e; // Re-throw to let caller handle
       } finally {
         isInitialized = true;
       }
@@ -39,10 +49,17 @@ export const RevenueCatService = {
 
   /**
    * Checks if the user has an active premium entitlement.
-   * Throws on network/RC error so callers can decide fallback behavior.
+   * iPadOS 26 compatible - handles errors gracefully
    */
   async checkPremiumStatus(): Promise<boolean> {
-    await this.initialize();
+    try {
+      await this.initialize();
+    } catch (initError) {
+      console.error('[RevenueCat] Init failed in checkPremiumStatus:', initError);
+      // Fall back to cache on init failure
+      const cached = await AsyncStorage.getItem(STORAGE_PRO_STATUS);
+      return cached ? JSON.parse(cached) : false;
+    }
 
     // On non-iOS platforms SDK is not configured, fall back to cache
     if (Platform.OS !== 'ios') {
@@ -50,11 +67,18 @@ export const RevenueCatService = {
       return cached ? JSON.parse(cached) : false;
     }
 
-    // Throws on failure — caller (FilterContext) handles fallback
-    const customerInfo = await Purchases.getCustomerInfo();
-    const isActive = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
-    await AsyncStorage.setItem(STORAGE_PRO_STATUS, JSON.stringify(isActive));
-    return isActive;
+    try {
+      // iPadOS 26 fix: Wrap in try-catch for beta compatibility
+      const customerInfo = await Purchases.getCustomerInfo();
+      const isActive = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      await AsyncStorage.setItem(STORAGE_PRO_STATUS, JSON.stringify(isActive));
+      return isActive;
+    } catch (error) {
+      console.error('[RevenueCat] getCustomerInfo failed:', error);
+      // Fall back to cache on error
+      const cached = await AsyncStorage.getItem(STORAGE_PRO_STATUS);
+      return cached ? JSON.parse(cached) : false;
+    }
   },
 
   /**

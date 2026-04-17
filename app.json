@@ -3,7 +3,7 @@
     "name": "WorldPulse",
     "slug": "worldpulse",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "worldpulse",
     "userInterfaceStyle": "automatic",
@@ -15,13 +15,11 @@
       "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.worldpulse.mobile",
       "buildNumber": "1",
       "infoPlist": {
-        "UIDeviceFamily": [
-          1
-        ],
+        "UIDeviceFamily": [1, 2],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
           "NSExceptionDomains": {
@@ -66,7 +64,8 @@
               "NSIncludesSubdomains": true
             }
           }
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

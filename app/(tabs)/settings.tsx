@@ -8,15 +8,19 @@ import {
   Pressable,
   Linking,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { useFilters } from '@/context/FilterContext';
+import { useDeviceType } from '@/hooks/useDeviceType';
 import { getCategoryEmoji, getCategoryLabel } from '@/utils/formatters';
 import { defaultFilters } from '@/context/FilterContext';
 import type { EventCategory, FilterSettings } from '@/types/events';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Star, ChevronRight } from 'lucide-react-native';
+import { Star, ChevronRight, Heart } from 'lucide-react-native';
+import { ReviewManager } from '@/utils/reviewManager';
 
 const CATEGORIES: { key: EventCategory; filterKey: keyof FilterSettings }[] = [
   { key: 'conflict',   filterKey: 'showConflicts' },
@@ -32,6 +36,7 @@ const CATEGORIES: { key: EventCategory; filterKey: keyof FilterSettings }[] = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { filters, updateFilter, resetFilters, isPro } = useFilters();
+  const deviceInfo = useDeviceType();
   
   if (isPro === null) {
     return (
@@ -56,18 +61,48 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleRateApp = async () => {
+    if (Platform.OS === 'ios') {
+      await ReviewManager.openAppStore();
+    } else {
+      Alert.alert(
+        'Rate WorldPulse',
+        'Would you like to rate us on the App Store?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Rate Now', 
+            onPress: () => ReviewManager.openAppStore()
+          }
+        ]
+      );
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <ScrollView style={styles.container} contentContainerStyle={[
+      styles.content,
+      deviceInfo.type === 'tablet' && styles.contentTablet
+    ]}>
+      <View style={[
+        styles.header,
+        deviceInfo.type === 'tablet' && styles.headerTablet
+      ]}>
         <View style={styles.titleRow}>
-          <Text style={styles.title}>Settings</Text>
+          <Text style={[
+            styles.title,
+            deviceInfo.type === 'tablet' && styles.titleTablet
+          ]}>Settings</Text>
           <View style={[styles.statusBadge, isPro ? styles.proBadgeContainer : styles.freeBadgeContainer]}>
             <Text style={[styles.statusBadgeText, isPro ? styles.proBadgeText : styles.freeBadgeText]}>
               {isPro ? 'PRO' : 'FREE'}
             </Text>
           </View>
         </View>
-        <Text style={styles.subtitle}>Customize your experience</Text>
+        <Text style={[
+          styles.subtitle,
+          deviceInfo.type === 'tablet' && styles.subtitleTablet
+        ]}>Customize your experience</Text>
       </View>
 
       {!isPro && (
@@ -204,12 +239,38 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Support</Text>
+        <View style={styles.card}>
+          <Pressable
+            style={styles.sourceRow}
+            onPress={handleRateApp}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: '#FF6B6B20' }]}>
+                <Heart size={18} color="#FF6B6B" fill="#FF6B6B" />
+              </View>
+              <View>
+                <Text style={styles.sourceName}>Rate WorldPulse</Text>
+                <Text style={styles.sourceUrl}>Help us improve with your feedback</Text>
+              </View>
+            </View>
+            <Text style={styles.externalLink}>→</Text>
+          </Pressable>
+        </View>
+      </View>
+
       <Pressable style={styles.resetButton} onPress={() => void resetFilters()}>
         <Text style={styles.resetButtonText}>Reset All Filters</Text>
       </Pressable>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>WorldPulse v1.0.0</Text>
+        <Pressable 
+          onLongPress={() => router.push('/review-debug' as any)}
+          delayLongPress={2000}
+        >
+          <Text style={styles.footerText}>WorldPulse v1.0.0</Text>
+        </Pressable>
         <Text style={styles.footerSubtext}>Real-time global intelligence</Text>
         <View style={styles.footerLinks}>
           <Pressable onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
@@ -233,20 +294,38 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 40,
   },
+  contentTablet: {
+    paddingBottom: 60,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
   header: {
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 24,
+  },
+  headerTablet: {
+    paddingHorizontal: 32,
+    paddingTop: 80,
+    paddingBottom: 32,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: Colors.text,
   },
+  titleTablet: {
+    fontSize: 40,
+  },
   subtitle: {
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 4,
+  },
+  subtitleTablet: {
+    fontSize: 18,
+    marginTop: 8,
   },
   section: {
     marginBottom: 24,
