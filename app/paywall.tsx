@@ -26,9 +26,30 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HEADER_HEIGHT = SCREEN_HEIGHT * 0.35;
 
 const BASE_PLANS = [
-  { id: 'WEEKLY',  matchIds: ['$rc_weekly', 'weekly', 'com.worldpulse.mobile.weekly'], title: 'Weekly',  fallbackPrice: '$1.99',  period: 'week',  save: null },
-  { id: 'MONTHLY', matchIds: ['$rc_monthly', 'monthly', 'com.worldpulse.mobile.monthly'], title: 'Monthly', fallbackPrice: '$4.99',  period: 'month', save: 'Save 20%' },
-  { id: 'ANNUAL',  matchIds: ['$rc_annual', 'yearly', 'annual', 'com.worldpulse.mobile.yearly'],   title: 'Yearly',  fallbackPrice: '$19.99', period: 'year',  save: 'Best Value' },
+  { 
+    id: 'WEEKLY',  
+    matchIds: ['$rc_weekly', 'weekly', 'com.worldpulse.mobile.weekly'], 
+    title: 'Weekly',  
+    fallbackPrice: '$1.99',  
+    period: 'week',  
+    save: null,
+  },
+  { 
+    id: 'MONTHLY', 
+    matchIds: ['$rc_monthly', 'monthly', 'com.worldpulse.mobile.monthly'], 
+    title: 'Monthly', 
+    fallbackPrice: '$4.99',  
+    period: 'month', 
+    save: 'Save 20%',
+  },
+  { 
+    id: 'ANNUAL',  
+    matchIds: ['$rc_annual', 'yearly', 'annual', 'com.worldpulse.mobile.yearly'],   
+    title: 'Yearly',  
+    fallbackPrice: '$19.99', 
+    period: 'year',  
+    save: 'Best Value',
+  },
 ];
 
 const PLAN_TO_PACKAGE_TYPE: Record<string, PACKAGE_TYPE> = {
@@ -112,7 +133,7 @@ export default function PaywallScreen() {
       {/* Hero Header Image */}
       <View style={styles.heroContainer}>
         <Image
-          source={require('@/assets/images/2.png')}
+          source={require('@/assets/images/1.jpeg')}
           style={styles.heroImage}
           resizeMode="cover"
         />
@@ -176,6 +197,7 @@ export default function PaywallScreen() {
                     plan.matchIds.includes(p.product.identifier)
                   );
                   const displayPrice = rcPkg ? rcPkg.product.priceString : plan.fallbackPrice;
+                  const isSelected = selectedPlan === plan.id;
 
                   return (
                     <Pressable
@@ -183,7 +205,7 @@ export default function PaywallScreen() {
                       onPress={() => setSelectedPlan(plan.id)}
                       style={[
                         styles.planCard,
-                        selectedPlan === plan.id && styles.selectedPlanCard,
+                        isSelected && styles.selectedPlanCard,
                       ]}
                     >
                       <View style={styles.planInfo}>
@@ -200,9 +222,9 @@ export default function PaywallScreen() {
                       )}
                       <View style={[
                         styles.checkbox,
-                        selectedPlan === plan.id && styles.selectedCheckbox
+                        isSelected && styles.selectedCheckbox
                       ]}>
-                        {selectedPlan === plan.id && <Check size={16} color="#000" />}
+                        {isSelected && <Check size={16} color="#000" />}
                       </View>
                     </Pressable>
                   );

@@ -43,11 +43,11 @@ export default function OnboardingScreen() {
   const handleComplete = async () => {
     try {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-      // Navigate to main app (tabs)
-      router.replace('/(tabs)' as any);
+      // Navigate to paywall after onboarding
+      router.replace('/paywall' as any);
     } catch (error) {
       console.error('Error saving onboarding state:', error);
-      router.replace('/(tabs)' as any);
+      router.replace('/paywall' as any);
     }
   };
 

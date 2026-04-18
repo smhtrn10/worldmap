@@ -28,7 +28,10 @@ export default function RootLayout() {
       try {
         // Check onboarding status
         const onboardingStatus = await AsyncStorage.getItem('@worldpulse_onboarding_completed');
-        setOnboardingComplete(onboardingStatus === 'true');
+        console.log('[RootLayout] Onboarding status from storage:', onboardingStatus);
+        const isComplete = onboardingStatus === 'true';
+        console.log('[RootLayout] Onboarding complete:', isComplete);
+        setOnboardingComplete(isComplete);
 
         // iPadOS 26 fix: Handle initialization errors gracefully
         await RevenueCatService.initialize();
@@ -52,8 +55,11 @@ export default function RootLayout() {
 
   // iPadOS 26 fix: Show loading screen until RC is ready
   if (!rcReady || onboardingComplete === null) {
+    console.log('[RootLayout] Loading... rcReady:', rcReady, 'onboardingComplete:', onboardingComplete);
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
+
+  console.log('[RootLayout] Rendering Stack. onboardingComplete:', onboardingComplete);
 
   return (
     <QueryClientProvider client={queryClient}>
