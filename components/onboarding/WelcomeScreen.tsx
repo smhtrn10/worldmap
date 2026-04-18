@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Globe, Zap, Shield } from 'lucide-react-native';
+import { useDeviceType } from '@/hooks/useDeviceType';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,6 +19,7 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
+  const deviceInfo = useDeviceType();
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const titleSlideAnim = useRef(new Animated.Value(40)).current;
@@ -211,20 +213,30 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
       </Animated.View>
 
       {/* Content Section */}
-      <View style={styles.contentSection}>
+      <View style={[
+        styles.contentSection,
+        deviceInfo.type === 'tablet' && styles.contentSectionTablet
+      ]}>
         <Animated.View
           style={{
             opacity: titleOpacityAnim,
             transform: [{ translateY: titleSlideAnim }],
           }}
         >
-          <Text style={styles.title}>WorldPulse</Text>
-          <Text style={styles.tagline}>GLOBAL INTELLIGENCE</Text>
+          <Text style={[
+            styles.title,
+            deviceInfo.type === 'tablet' && styles.titleTablet
+          ]}>WorldPulse</Text>
+          <Text style={[
+            styles.tagline,
+            deviceInfo.type === 'tablet' && styles.taglineTablet
+          ]}>GLOBAL INTELLIGENCE</Text>
         </Animated.View>
 
         <Animated.Text
           style={[
             styles.subtitle,
+            deviceInfo.type === 'tablet' && styles.subtitleTablet,
             { opacity: subtitleOpacityAnim },
           ]}
         >
@@ -236,15 +248,24 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
         <View style={styles.features}>
           <View style={styles.featureItem}>
             <Text style={styles.featureDot}>●</Text>
-            <Text style={styles.featureText}>Live event tracking</Text>
+            <Text style={[
+              styles.featureText,
+              deviceInfo.type === 'tablet' && styles.featureTextTablet
+            ]}>Live event tracking</Text>
           </View>
           <View style={styles.featureItem}>
             <Text style={styles.featureDot}>●</Text>
-            <Text style={styles.featureText}>Interactive world map</Text>
+            <Text style={[
+              styles.featureText,
+              deviceInfo.type === 'tablet' && styles.featureTextTablet
+            ]}>Interactive world map</Text>
           </View>
           <View style={styles.featureItem}>
             <Text style={styles.featureDot}>●</Text>
-            <Text style={styles.featureText}>Instant notifications</Text>
+            <Text style={[
+              styles.featureText,
+              deviceInfo.type === 'tablet' && styles.featureTextTablet
+            ]}>Instant notifications</Text>
           </View>
         </View>
 
@@ -258,6 +279,7 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
           <Pressable
             style={({ pressed }) => [
               styles.continueButton,
+              deviceInfo.type === 'tablet' && styles.continueButtonTablet,
               pressed && styles.continueButtonPressed,
             ]}
             onPress={onContinue}
@@ -268,7 +290,10 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
               end={{ x: 1, y: 1 }}
               style={styles.buttonGradient}
             >
-              <Text style={styles.continueButtonText}>GET STARTED</Text>
+              <Text style={[
+                styles.continueButtonText,
+                deviceInfo.type === 'tablet' && styles.continueButtonTextTablet
+              ]}>GET STARTED</Text>
             </LinearGradient>
           </Pressable>
         </Animated.View>
@@ -324,7 +349,15 @@ const styles = StyleSheet.create({
   contentSection: {
     flex: 1,
     paddingHorizontal: 24,
+    paddingTop: 16,
+    justifyContent: 'flex-start',
+  },
+  contentSectionTablet: {
+    paddingHorizontal: 48,
     paddingTop: 32,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
   },
   title: {
     fontSize: 42,
@@ -332,6 +365,9 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textAlign: 'center',
     letterSpacing: -1,
+  },
+  titleTablet: {
+    fontSize: 56,
   },
   tagline: {
     fontSize: 13,
@@ -341,6 +377,10 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginTop: 8,
   },
+  taglineTablet: {
+    fontSize: 16,
+    letterSpacing: 4,
+  },
   subtitle: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.7)',
@@ -348,9 +388,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
     lineHeight: 24,
   },
-  features: {
+  subtitleTablet: {
+    fontSize: 20,
+    lineHeight: 30,
     marginTop: 32,
-    gap: 12,
+  },
+  features: {
+    marginTop: 24,
+    gap: 10,
   },
   featureItem: {
     flexDirection: 'row',
@@ -366,8 +411,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
   },
+  featureTextTablet: {
+    fontSize: 18,
+  },
   continueButton: {
-    marginTop: 40,
+    marginTop: 32,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#00FF64',
@@ -375,6 +423,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 8,
+  },
+  continueButtonTablet: {
+    marginTop: 48,
+    borderRadius: 20,
   },
   continueButtonPressed: {
     opacity: 0.8,
@@ -388,5 +440,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000',
     letterSpacing: 2,
+  },
+  continueButtonTextTablet: {
+    fontSize: 20,
+    letterSpacing: 3,
   },
 });

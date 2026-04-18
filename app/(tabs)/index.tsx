@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Platform, Pressable, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
 import { fetchAllEvents } from '@/services/api';
 import { useFilters } from '@/context/FilterContext';
@@ -37,6 +38,28 @@ export default function MapScreen() {
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const { filters, isPro } = useFilters();
   const deviceInfo = useDeviceType();
+
+  // Show paywall modal on first launch after onboarding
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      try {
+        const hasSeenPaywall = await AsyncStorage.getItem('@worldpulse_paywall_shown');
+        if (!hasSeenPaywall && isPro === false) {
+          await AsyncStorage.setItem('@worldpulse_paywall_shown', 'true');
+          // Small delay to let the app settle
+          setTimeout(() => {
+            router.push('/paywall' as any);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error checking paywall status:', error);
+      }
+    };
+    
+    if (isPro !== null) {
+      checkFirstLaunch();
+    }
+  }, [isPro, router]);
 
   // All hooks must be called before any early return
   const disabledCategories: EventCategory[] = isPro ? [] : ['conflict', 'unrest'];

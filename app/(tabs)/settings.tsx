@@ -21,6 +21,7 @@ import type { EventCategory, FilterSettings } from '@/types/events';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Star, ChevronRight, Heart } from 'lucide-react-native';
 import { ReviewManager } from '@/utils/reviewManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CATEGORIES: { key: EventCategory; filterKey: keyof FilterSettings }[] = [
   { key: 'conflict',   filterKey: 'showConflicts' },
@@ -77,6 +78,58 @@ export default function SettingsScreen() {
         ]
       );
     }
+  };
+
+  const handleResetOnboarding = async () => {
+    Alert.alert(
+      '🔄 Reset Onboarding',
+      'This will restart the onboarding flow. This is a dev feature.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove([
+                '@worldpulse_onboarding_completed',
+                '@worldpulse_paywall_shown'
+              ]);
+              Alert.alert('✅ Success', 'Onboarding reset! Restart the app to see it again.');
+            } catch (error) {
+              Alert.alert('❌ Error', 'Failed to reset onboarding');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleResetProStatus = async () => {
+    Alert.alert(
+      '🔓 Reset PRO Status',
+      'This will clear your PRO status cache and set you to FREE. This is a dev feature.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset to FREE',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove([
+                '@worldpulse_is_pro_status',
+                '@worldpulse_paywall_shown',
+                '@conflict_last_fetch',
+                '@conflict_cached_events'
+              ]);
+              Alert.alert('✅ Success', 'PRO status cleared! Restart the app to see FREE mode.');
+            } catch (error) {
+              Alert.alert('❌ Error', 'Failed to reset PRO status');
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -259,6 +312,44 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
       </View>
+
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer Tools</Text>
+          <View style={styles.card}>
+            <Pressable
+              style={[styles.sourceRow, styles.sourceRowBorder]}
+              onPress={handleResetOnboarding}
+            >
+              <View style={styles.settingLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: '#FFA50020' }]}>
+                  <Text style={styles.icon}>🔄</Text>
+                </View>
+                <View>
+                  <Text style={styles.sourceName}>Reset Onboarding</Text>
+                  <Text style={styles.sourceUrl}>Restart the welcome flow</Text>
+                </View>
+              </View>
+              <Text style={styles.externalLink}>→</Text>
+            </Pressable>
+            <Pressable
+              style={styles.sourceRow}
+              onPress={handleResetProStatus}
+            >
+              <View style={styles.settingLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: '#FF6B6B20' }]}>
+                  <Text style={styles.icon}>🔓</Text>
+                </View>
+                <View>
+                  <Text style={styles.sourceName}>Reset PRO Status</Text>
+                  <Text style={styles.sourceUrl}>Clear cache and set to FREE</Text>
+                </View>
+              </View>
+              <Text style={styles.externalLink}>→</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       <Pressable style={styles.resetButton} onPress={() => void resetFilters()}>
         <Text style={styles.resetButtonText}>Reset All Filters</Text>

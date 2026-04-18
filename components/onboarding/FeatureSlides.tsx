@@ -65,10 +65,6 @@ export function FeatureSlides({ onComplete }: FeatureSlidesProps) {
     }
   };
 
-  const handleSkip = () => {
-    onComplete();
-  };
-
   const SlideComponent = SLIDES[currentSlide];
 
   return (
@@ -100,13 +96,6 @@ export function FeatureSlides({ onComplete }: FeatureSlidesProps) {
           />
         ))}
       </View>
-
-      {/* Skip Button */}
-      {currentSlide < SLIDES.length - 1 && (
-        <Pressable style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipText}>SKIP</Text>
-        </Pressable>
-      )}
 
       {/* Slide Content */}
       <Animated.View style={[styles.slideContainer, { opacity: slideOpacity }]}>
@@ -175,20 +164,6 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: '#00FF64',
     width: 24,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: 16,
-    right: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    zIndex: 10,
-  },
-  skipText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
   },
   slideContainer: {
     flex: 1,

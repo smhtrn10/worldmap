@@ -20,6 +20,7 @@ import { useFilters } from '@/context/FilterContext';
 import { RevenueCatService } from '@/services/revenuecat';
 import { PurchasesPackage, PACKAGE_TYPE } from 'react-native-purchases';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDeviceType } from '@/hooks/useDeviceType';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HEADER_HEIGHT = SCREEN_HEIGHT * 0.35;
@@ -38,6 +39,7 @@ const PLAN_TO_PACKAGE_TYPE: Record<string, PACKAGE_TYPE> = {
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const deviceInfo = useDeviceType();
   const { setIsPro } = useFilters();
   const queryClient = useQueryClient();
   const [selectedPlan, setSelectedPlan] = useState('ANNUAL');
@@ -121,7 +123,10 @@ export default function PaywallScreen() {
       </View>
       
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
+        <View style={[
+          styles.container,
+          deviceInfo.type === 'tablet' && styles.containerTablet
+        ]}>
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={() => router.back()} style={styles.closeButton}>
@@ -262,6 +267,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  containerTablet: {
+    paddingHorizontal: 48,
+    maxWidth: 900,
+    alignSelf: 'center',
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
