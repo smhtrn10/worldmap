@@ -73,7 +73,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.worldpulse.mobile"
+      "package": "com.worldpulse.mobile",
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/images/favicon.png"

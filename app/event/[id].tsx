@@ -181,7 +181,7 @@ export default function EventDetailScreen() {
               <Text style={styles.sourceName}>
                 {event.source === 'usgs' && 'USGS Earthquake Hazards'}
                 {event.source === 'eonet' && 'NASA EONET'}
-                {event.source === 'bbc' && 'BBC World News'}
+                {event.source === 'bbc' && 'World News'}
               </Text>
               <Text style={styles.sourceTime}>
                 Updated {formatTimeAgo(event.timestamp)}

@@ -269,23 +269,12 @@ export default function SettingsScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.sourceRow, styles.sourceRowBorder]}
+            style={styles.sourceRow}
             onPress={() => Linking.openURL('https://eonet.gsfc.nasa.gov')}
           >
             <View>
               <Text style={styles.sourceName}>NASA EONET</Text>
               <Text style={styles.sourceUrl}>eonet.gsfc.nasa.gov</Text>
-            </View>
-            <Text style={styles.externalLink}>→</Text>
-          </Pressable>
-          
-          <Pressable
-            style={styles.sourceRow}
-            onPress={() => Linking.openURL('https://www.bbc.com/news')}
-          >
-            <View>
-              <Text style={styles.sourceName}>BBC World News</Text>
-              <Text style={styles.sourceUrl}>bbc.com/news</Text>
             </View>
             <Text style={styles.externalLink}>→</Text>
           </Pressable>
