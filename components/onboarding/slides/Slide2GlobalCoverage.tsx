@@ -1,82 +1,32 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Animated, Dimensions, Easing } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width, height } = Dimensions.get('window');
 
 export function Slide2GlobalCoverage() {
-  const counterVal = useRef(new Animated.Value(0)).current;
-  const [counter, setCounter] = React.useState(0);
-  const mascotBounce = useRef(new Animated.Value(0)).current;
-
-  // Falling objects
-  const objects = useRef(
-    Array.from({ length: 9 }, () => ({
-      y: new Animated.Value(-100),
-      op: new Animated.Value(0),
-      rotate: new Animated.Value(0),
-    }))
-  ).current;
+  const player = useVideoPlayer(require('@/assets/images/3.mp4'), (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  const titleSlide = useRef(new Animated.Value(40)).current;
+  const titleOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Counter animation
-    Animated.timing(counterVal, {
-      toValue: 195,
-      duration: 1800,
-      delay: 600,
-      useNativeDriver: false,
-    }).start();
-
-    counterVal.addListener(({ value }) => setCounter(Math.floor(value)));
-
-    // Falling objects
-    Animated.stagger(
-      80,
-      objects.map((obj) =>
-        Animated.parallel([
-          Animated.timing(obj.y, {
-            toValue: height * 0.35,
-            duration: 1200,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(obj.op, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(obj.rotate, {
-            toValue: 720,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-        ])
-      )
-    ).start();
-
-    // Mascot bounce loop
-    const bounceLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(mascotBounce, {
-          toValue: -22,
-          duration: 220,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(mascotBounce, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-      { iterations: 5 }
-    );
-    bounceLoop.start();
-
-    return () => {
-      counterVal.removeAllListeners();
-      bounceLoop.stop();
-    };
+    Animated.parallel([
+      Animated.timing(titleSlide, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(titleOp, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const emojis = ['🌍', '🔥', '🌊', '⚡', '🌪️', '🗺️', '📡', '🛰️', '📊'];
@@ -84,53 +34,19 @@ export function Slide2GlobalCoverage() {
   return (
     <View style={styles.container}>
       <View style={styles.sceneArea}>
-        {/* Falling objects */}
-        {objects.map((obj, i) => (
-          <Animated.Text
-            key={i}
-            style={[
-              styles.fallingObject,
-              {
-                left: (i % 3) * (width / 3) + width / 6,
-                opacity: obj.op,
-                transform: [
-                  { translateY: obj.y },
-                  {
-                    rotate: obj.rotate.interpolate({
-                      inputRange: [0, 720],
-                      outputRange: ['0deg', '720deg'],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            {emojis[i]}
-          </Animated.Text>
-        ))}
-
-        {/* Counter */}
-        <View style={styles.counterContainer}>
-          <Text style={styles.counterNumber}>{counter}</Text>
-          <Text style={styles.counterLabel}>COUNTRIES</Text>
-        </View>
-
-        {/* Mascot */}
-        <Animated.Text
-          style={[
-            styles.mascot,
-            { transform: [{ translateY: mascotBounce }] },
-          ]}
-        >
-          🌐
-        </Animated.Text>
+        <VideoView
+          style={StyleSheet.absoluteFill}
+          player={player}
+          nativeControls={false}
+          contentFit="cover"
+        />
       </View>
 
       <View style={styles.socialBanner}>
         <Text style={styles.socialText}>🔥 Covering every continent</Text>
       </View>
 
-      <View style={styles.content}>
+      <Animated.View style={[styles.content, { opacity: titleOp, transform: [{ translateY: titleSlide }] }]}>
         <Text style={styles.title}>Worldwide Coverage</Text>
         <Text style={styles.subtitle}>
           Monitor events across 195 countries with comprehensive global data sources.
@@ -149,7 +65,7 @@ export function Slide2GlobalCoverage() {
             <Text style={styles.compareValuePremium}>Global access</Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }

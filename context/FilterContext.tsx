@@ -35,6 +35,11 @@ export const [FilterProvider, useFilters] = createContextHook(() => {
 
   // O2: AppState listener — uygulama öne gelince PRO durumunu yenile
   useEffect(() => {
+    // KATEGORİ 6: RevenueCat Real-time Listener bağlantısı
+    RevenueCatService.setUpdateListener((livePro) => {
+      setIsPro(livePro);
+    });
+
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
         void loadLivePro();

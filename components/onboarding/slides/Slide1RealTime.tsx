@@ -7,171 +7,45 @@ import {
   Dimensions,
   Easing,
 } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width, height } = Dimensions.get('window');
 
 export function Slide1RealTime() {
-  const mascotScale = useRef(new Animated.Value(0)).current;
-  const flashOp = useRef(new Animated.Value(0)).current;
+  const player = useVideoPlayer(require('@/assets/images/2.mp4'), (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
   const titleSlide = useRef(new Animated.Value(40)).current;
   const titleOp = useRef(new Animated.Value(0)).current;
-  const shimmer = useRef(new Animated.Value(-width)).current;
-
-  // Stars for burst
-  const stars = useRef(
-    Array.from({ length: 6 }, () => ({
-      x: new Animated.Value(0),
-      y: new Animated.Value(0),
-      op: new Animated.Value(0),
-      sc: new Animated.Value(0),
-    }))
-  ).current;
 
   useEffect(() => {
-    // Animation sequence
-    Animated.sequence([
-      // 1. Mascot pop
-      Animated.spring(mascotScale, {
-        toValue: 1,
-        friction: 4,
-        tension: 80,
-        delay: 200,
+    Animated.parallel([
+      Animated.timing(titleSlide, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      // 2. Flash effect
-      Animated.sequence([
-        Animated.timing(flashOp, { toValue: 1, duration: 60, useNativeDriver: true }),
-        Animated.timing(flashOp, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(flashOp, { toValue: 0.8, duration: 60, useNativeDriver: true }),
-        Animated.timing(flashOp, { toValue: 0, duration: 250, useNativeDriver: true }),
-      ]),
-      // 3. Stars burst
-      Animated.parallel(
-        stars.map((s, i) => {
-          const angle = (i / stars.length) * Math.PI * 2;
-          const dist = 60 + Math.random() * 40;
-          return Animated.parallel([
-            Animated.timing(s.x, {
-              toValue: Math.cos(angle) * dist,
-              duration: 600,
-              delay: i * 40,
-              useNativeDriver: true,
-            }),
-            Animated.timing(s.y, {
-              toValue: Math.sin(angle) * dist,
-              duration: 600,
-              delay: i * 40,
-              useNativeDriver: true,
-            }),
-            Animated.timing(s.op, {
-              toValue: 1,
-              duration: 200,
-              delay: i * 40,
-              useNativeDriver: true,
-            }),
-            Animated.spring(s.sc, {
-              toValue: 1,
-              friction: 4,
-              tension: 100,
-              useNativeDriver: true,
-            }),
-          ]);
-        })
-      ),
-      // 4. Title slide-up
-      Animated.parallel([
-        Animated.timing(titleSlide, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(titleOp, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-
-    // Shimmer loop
-    const shimmerLoop = Animated.loop(
-      Animated.timing(shimmer, {
-        toValue: width * 1.5,
-        duration: 2000,
-        delay: 1500,
-        easing: Easing.linear,
+      Animated.timing(titleOp, {
+        toValue: 1,
+        duration: 400,
         useNativeDriver: true,
-      })
-    );
-    shimmerLoop.start();
-
-    return () => {
-      shimmerLoop.stop();
-    };
+      }),
+    ]).start();
   }, []);
 
   return (
     <View style={styles.container}>
       {/* Scene Area */}
       <View style={styles.sceneArea}>
-        {/* Flash overlay */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: '#FFF', opacity: flashOp, zIndex: 20 },
-          ]}
+        <VideoView
+          style={StyleSheet.absoluteFill}
+          player={player}
+          nativeControls={false}
+          contentFit="cover"
         />
-
-        {/* Shimmer effect */}
-        <Animated.View
-          style={[
-            styles.shimmer,
-            { transform: [{ translateX: shimmer }, { skewX: '-20deg' }] },
-          ]}
-        />
-
-        {/* Main mascot */}
-        <Animated.View
-          style={[
-            styles.mascotContainer,
-            { transform: [{ scale: mascotScale }] },
-          ]}
-        >
-          <Text style={styles.mascotEmoji}>🌍</Text>
-          <View style={styles.pulseRing} />
-        </Animated.View>
-
-        {/* Burst stars */}
-        {stars.map((s, i) => (
-          <Animated.Text
-            key={i}
-            style={[
-              styles.star,
-              {
-                opacity: s.op,
-                transform: [
-                  { translateX: s.x },
-                  { translateY: s.y },
-                  { scale: s.sc },
-                ],
-              },
-            ]}
-          >
-            {i % 2 === 0 ? '⚡' : '✨'}
-          </Animated.Text>
-        ))}
-
-        {/* Floating event indicators */}
-        <View style={[styles.eventBadge, { top: '20%', left: '15%' }]}>
-          <Text style={styles.eventEmoji}>🔥</Text>
-        </View>
-        <View style={[styles.eventBadge, { top: '35%', right: '12%' }]}>
-          <Text style={styles.eventEmoji}>🌊</Text>
-        </View>
-        <View style={[styles.eventBadge, { bottom: '25%', left: '20%' }]}>
-          <Text style={styles.eventEmoji}>⚠️</Text>
-        </View>
       </View>
 
       {/* Social Proof Banner */}

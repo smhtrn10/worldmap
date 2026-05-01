@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
   Text,
-  Pressable,
+  TouchableOpacity,
   Image,
   ScrollView,
   Dimensions,
   Linking,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { useRouter } from 'expo-router';
-import { X, Check, Shield, Globe, Zap, ArrowRight, Loader2 } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { X, Check, Shield, Globe, Zap, Loader2, Lock, Flame, AlertTriangle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFilters } from '@/context/FilterContext';
@@ -21,56 +21,81 @@ import { RevenueCatService } from '@/services/revenuecat';
 import { PurchasesPackage, PACKAGE_TYPE } from 'react-native-purchases';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDeviceType } from '@/hooks/useDeviceType';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const HEADER_HEIGHT = SCREEN_HEIGHT * 0.35;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ─── APP CONFIG ──────────────────────────────────────────────────────────────
+const APP_CONFIG = {
+  name: "World Plus",
+  headline: "World Monitor Real-Time Intel",
+  subtitle: "Elite intelligence network & strategic conflict mapping",
+  counterVerb: "detecting live threats",
+  ctaLabel: "Unlock Intelligence Access",
+  trialDays: 3,
+  accentColor: "#FF4D00", 
+  gradientColors: ["#000000", "#050505", "#0a0a0a"] as const,
+  benefits: [
+    { icon: <Shield size={18} color="#FF4D00" />, text: "Global Conflict Network Access" },
+    { icon: <Flame size={18} color="#FF4D00" />, text: "Real-time Strike & Fire Alerts" },
+    { icon: <Globe size={18} color="#FF4D00" />, text: "Live Geographic Intelligence" },
+    { icon: <Zap size={18} color="#FF4D00" />, text: "Instant High-Priority Notifications" },
+    { icon: <Lock size={18} color="#FF4D00" />, text: "Secure End-to-End Intel Feed" },
+  ],
+};
 
 const BASE_PLANS = [
-  { 
-    id: 'WEEKLY',  
-    matchIds: ['$rc_weekly', 'weekly', 'com.worldpulse.mobile.weekly'], 
-    title: 'Weekly',  
-    fallbackPrice: '$1.99',  
-    period: 'week',  
-    save: null,
-  },
-  { 
-    id: 'MONTHLY', 
-    matchIds: ['$rc_monthly', 'monthly', 'com.worldpulse.mobile.monthly'], 
-    title: 'Monthly', 
-    fallbackPrice: '$4.99',  
-    period: 'month', 
-    save: 'Save 20%',
-  },
-  { 
-    id: 'ANNUAL',  
-    matchIds: ['$rc_annual', 'yearly', 'annual', 'com.worldpulse.mobile.yearly'],   
-    title: 'Yearly',  
-    fallbackPrice: '$19.99', 
-    period: 'year',  
-    save: 'Best Value',
-  },
+  { id: 'WEEKLY', matchIds: ['$rc_weekly', 'weekly'], title: 'Weekly', fallbackPrice: '$1.99', period: 'week', sub: 'Critical intel access' },
+  { id: 'MONTHLY', matchIds: ['$rc_monthly', 'monthly'], title: 'Monthly', fallbackPrice: '$4.99', period: 'month', sub: 'Strategic monitoring' },
+  { id: 'ANNUAL', matchIds: ['$rc_annual', 'yearly'], title: 'Yearly', fallbackPrice: '$19.99', period: 'year', sub: 'Just $0.38/week', badge: 'ELITE ACCESS' },
 ];
 
 const PLAN_TO_PACKAGE_TYPE: Record<string, PACKAGE_TYPE> = {
-  'WEEKLY':  PACKAGE_TYPE.WEEKLY,
+  'WEEKLY': PACKAGE_TYPE.WEEKLY,
   'MONTHLY': PACKAGE_TYPE.MONTHLY,
   'ANNUAL':  PACKAGE_TYPE.ANNUAL,
 };
+
+const VIDEO_SOURCE = require('@/assets/images/1.mp4');
 
 export default function PaywallScreen() {
   const router = useRouter();
   const deviceInfo = useDeviceType();
   const { setIsPro } = useFilters();
   const queryClient = useQueryClient();
+  
   const [selectedPlan, setSelectedPlan] = useState('ANNUAL');
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  // O4: Restore için ayrı state — kullanıcıya "Restoring..." göster
   const [isRestoring, setIsRestoring] = useState(false);
+  const [showClose, setShowClose] = useState(false); // KATEGORİ 13: 7 saniye kuralı
 
-  React.useEffect(() => {
+  // Animations
+  const [liveCount, setLiveCount] = useState(1362);
+  const scanAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.5)).current;
+
+  // Video Player
+  const player = useVideoPlayer(VIDEO_SOURCE, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+
+  // Enforce autoplay when screen is focused without blocking JS thread
+  useFocusEffect(
+    React.useCallback(() => {
+      if (player) {
+        setTimeout(() => {
+          player.play();
+        }, 150); // Give route transition time to finish
+      }
+    }, [player])
+  );
+
+  useEffect(() => {
     const loadOfferings = async () => {
       const available = await RevenueCatService.getOfferings();
       setPackages(available);
@@ -79,412 +104,255 @@ export default function PaywallScreen() {
     loadOfferings();
   }, []);
 
+  // Social proof drift
+  useEffect(() => {
+    const tick = () => {
+      setLiveCount((n) => Math.max(1300, Math.min(1500, n + (Math.random() > 0.5 ? 1 : -1))));
+      setTimeout(tick, Math.random() * 5000 + 3000);
+    };
+    const t = setTimeout(tick, 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Main Loop Animations
+  useEffect(() => {
+    // Scan Line
+    Animated.loop(
+      Animated.timing(scanAnim, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true })
+    ).start();
+
+    // Node Pulse
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.4, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Card Glow
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1,   duration: 2000, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.3, duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  // KATEGORİ 13: 7 saniye kuralı — Kapatma butonu gecikmeli görünsün
+  useEffect(() => {
+    const t = setTimeout(() => setShowClose(true), 7000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const scanTranslate = scanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 260],
+  });
+
   const handleContinue = async () => {
     const planConfig = BASE_PLANS.find(p => p.id === selectedPlan);
-    const pkg = packages.find(p =>
-      p.packageType === PLAN_TO_PACKAGE_TYPE[selectedPlan] ||
-      planConfig?.matchIds.includes(p.identifier) ||
-      planConfig?.matchIds.includes(p.product.identifier)
-    );
+    const pkg = packages.find(p => p.packageType === PLAN_TO_PACKAGE_TYPE[selectedPlan] || planConfig?.matchIds.includes(p.identifier));
     if (!pkg) {
-      console.warn('[Paywall] No matching package found for', selectedPlan);
       if (__DEV__) {
-        console.log('[Paywall] Development mode: Applying fallback PRO status.');
         await AsyncStorage.setItem('@worldpulse_is_pro_status', JSON.stringify(true));
         setIsPro(true);
-        // K3: event listesini yenile
         void queryClient.invalidateQueries({ queryKey: ['all-events'] });
         router.back();
       }
       return;
     }
-
     setIsPurchasing(true);
     const success = await RevenueCatService.purchasePackage(pkg);
     setIsPurchasing(false);
-
     if (success) {
       setIsPro(true);
-      // K3: Satın alma başarılı — conflict intel dahil event listesini yenile
       void queryClient.invalidateQueries({ queryKey: ['all-events'] });
       router.back();
     }
   };
 
   const handleRestore = async () => {
-    // O4: isLoading yerine isRestoring — plan listesi gizlenmesin
     setIsRestoring(true);
     const success = await RevenueCatService.restorePurchases();
     setIsRestoring(false);
-
     if (success) {
       setIsPro(true);
-      // K3 + O2: Restore başarılı — event listesini yenile
       void queryClient.invalidateQueries({ queryKey: ['all-events'] });
       router.back();
-    } else {
-      // O3: Restore başarısız veya iptal — conflict cache'i temizle (stale data kalmasın)
-      await AsyncStorage.multiRemove(['@conflict_last_fetch', '@conflict_cached_events']);
     }
   };
 
   return (
-    <View style={styles.mainContainer}>
-      {/* Hero Header Image */}
-      <View style={styles.heroContainer}>
-        <Image
-          source={require('@/assets/images/1.jpeg')}
-          style={styles.heroImage}
-          resizeMode="cover"
-        />
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.5)', '#000']}
-          style={styles.gradientOverlay}
-        />
-      </View>
-      
+    <LinearGradient colors={APP_CONFIG.gradientColors} style={styles.mainContainer}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={[
-          styles.container,
-          deviceInfo.type === 'tablet' && styles.containerTablet
-        ]}>
-          {/* Header */}
+        <ScrollView contentContainerStyle={[styles.scrollContent, deviceInfo.type === 'tablet' && styles.tabletScroll]} showsVerticalScrollIndicator={false}>
+          
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} style={styles.closeButton}>
-              <BlurView intensity={20} tint="dark" style={styles.closeIconContainer}>
-                <X size={24} color="#FFF" />
-              </BlurView>
-            </Pressable>
+            {showClose && (
+              <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+                <X size={24} color="rgba(255,255,255,0.3)" />
+              </TouchableOpacity>
+            )}
+            <View style={styles.titleGroup}>
+              <Text style={styles.headline}>{APP_CONFIG.headline}</Text>
+              <Text style={styles.subtitle}>{APP_CONFIG.subtitle}</Text>
+            </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {/* Title Section */}
-            <View style={styles.titleSection}>
-              <Text style={styles.title}>Unlock Global{'\n'}Intelligence</Text>
-              <Text style={styles.subtitle}>
-                Get unrestricted access to conflict tracking and elite humanitarian data worldwide.
-              </Text>
+          <View style={styles.counterRow}>
+            <View style={styles.counterBadge}>
+              <Text style={styles.counterText}>📡 {liveCount} agents {APP_CONFIG.counterVerb}</Text>
             </View>
+          </View>
 
-            {/* Features Section */}
-            <View style={styles.features}>
-              <FeatureItem 
-                icon={<Shield size={20} color="#FFD700" />} 
-                text="Access Restricted Conflict Mapping" 
-              />
-              <FeatureItem 
-                icon={<Zap size={20} color="#FFD700" />} 
-                text="Real-time Social Unrest Monitoring" 
-              />
-              <FeatureItem 
-                icon={<Globe size={20} color="#FFD700" />} 
-                text="Advanced Geographic Analytics" 
-              />
-            </View>
+          {/* VIDEO VISUAL */}
+          <View style={styles.visualBox}>
+            <VideoView
+              style={styles.worldImage}
+              player={player}
+              nativeControls={false}
+              contentFit="cover"
+            />
 
-            {/* Plans Section */}
-            <View style={styles.plansContainer}>
-              {isLoading ? (
-                <View style={{ padding: 40, alignItems: 'center' }}>
-                  <Loader2 size={32} color="#FFD700" style={{ marginBottom: 10 }} />
-                  <Text style={{ color: 'rgba(255,255,255,0.6)' }}>Fetching live prices...</Text>
-                </View>
-              ) : (
-                BASE_PLANS.map((plan) => {
-                  const rcPkg = packages.find(p => 
-                    p.packageType === PLAN_TO_PACKAGE_TYPE[plan.id] || 
-                    plan.matchIds.includes(p.identifier) || 
-                    plan.matchIds.includes(p.product.identifier)
-                  );
-                  const displayPrice = rcPkg ? rcPkg.product.priceString : plan.fallbackPrice;
-                  const isSelected = selectedPlan === plan.id;
-
-                  return (
-                    <Pressable
-                      key={plan.id}
-                      onPress={() => setSelectedPlan(plan.id)}
-                      style={[
-                        styles.planCard,
-                        isSelected && styles.selectedPlanCard,
-                      ]}
-                    >
-                      <View style={styles.planInfo}>
-                        <Text style={styles.planTitle}>{plan.title}</Text>
-                        <Text style={styles.planPrice}>
-                          {displayPrice}
-                          <Text style={styles.planPeriod}>/{plan.period}</Text>
-                        </Text>
-                      </View>
-                      {plan.save && (
-                        <View style={styles.saveBadge}>
-                          <Text style={styles.saveBadgeText}>{plan.save}</Text>
-                        </View>
-                      )}
-                      <View style={[
-                        styles.checkbox,
-                        isSelected && styles.selectedCheckbox
-                      ]}>
-                        {isSelected && <Check size={16} color="#000" />}
-                      </View>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
-
-            {/* Main Action */}
-            <Pressable 
-              style={[styles.continueButton, (isPurchasing || isLoading) && { opacity: 0.7 }]} 
-              onPress={handleContinue}
-              disabled={isPurchasing || isLoading}
-            >
-              <Text style={styles.continueButtonText}>
-                {isPurchasing ? 'PROCESSING...' : 'UNLEASH POWER'}
-              </Text>
-              {!isPurchasing && <ArrowRight size={20} color="#000" />}
-            </Pressable>
-
-            {/* Footer Links */}
-            <View style={styles.footer}>
-              <Pressable onPress={handleRestore} disabled={isRestoring}>
-                <Text style={styles.footerLink}>{isRestoring ? 'Restoring...' : 'Restore Purchase'}</Text>
-              </Pressable>
-              <View style={styles.dot} />
-              <Pressable onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
-                <Text style={styles.footerLink}>Terms</Text>
-              </Pressable>
-              <View style={styles.dot} />
-              <Pressable onPress={() => Linking.openURL('https://semihtrn4.github.io/worldpulse_privacy/')}>
-                <Text style={styles.footerLink}>Privacy Policy</Text>
-              </Pressable>
-            </View>
+            {/* Scan Line Overlay */}
+            <Animated.View style={[styles.scanLine, { transform: [{ translateY: scanTranslate }] }]} />
             
-            <Text style={styles.disclaimer}>
-              Recurring billing. Cancel anytime.
-            </Text>
-          </ScrollView>
-        </View>
-      </SafeAreaView>
-    </View>
-  );
-}
+            <View style={styles.activeTag}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.activeTagText}>LIVE INTEL FEED</Text>
+            </View>
+          </View>
 
-function FeatureItem({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <View style={styles.featureItem}>
-      <View style={styles.featureIconContainer}>{icon}</View>
-      <Text style={styles.featureText}>{text}</Text>
-    </View>
+          <View style={styles.benefitsContainer}>
+            {APP_CONFIG.benefits.map((b, idx) => (
+              <View key={idx} style={styles.benefitRow}>
+                <View style={styles.benefitIcon}>{b.icon}</View>
+                <Text style={styles.benefitText}>{b.text}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.plansContainer}>
+            {isLoading ? (
+              <View style={styles.loadingPrices}>
+                <Loader2 size={24} color={APP_CONFIG.accentColor} />
+                <Text style={styles.loadingText}>Connecting to encrypted store...</Text>
+              </View>
+            ) : (
+              BASE_PLANS.map((plan) => {
+                const rcPkg = packages.find(p => p.packageType === PLAN_TO_PACKAGE_TYPE[plan.id] || plan.matchIds.includes(p.identifier));
+                const displayPrice = rcPkg ? rcPkg.product.priceString : plan.fallbackPrice;
+                const isSelected = selectedPlan === plan.id;
+                const isAnnual = plan.id === 'ANNUAL';
+
+                if (isAnnual) {
+                  return (
+                    <TouchableOpacity key={plan.id} onPress={() => setSelectedPlan(plan.id)} activeOpacity={0.9}>
+                      <Animated.View style={[styles.card, styles.annualCard, { borderColor: isSelected ? APP_CONFIG.accentColor : 'rgba(255,77,0,0.2)', opacity: isSelected ? 1 : glowAnim }]}>
+                        <View style={[styles.annualBadge, { backgroundColor: APP_CONFIG.accentColor }]}>
+                          <Animated.Text style={[styles.badgeText, { transform: [{ scale: pulseAnim }] }]}>⭐ {plan.badge} ⭐</Animated.Text>
+                        </View>
+                        <View style={styles.cardContent}>
+                          <View>
+                            <Text style={styles.cardTitle}>{plan.title}</Text>
+                            <Text style={[styles.cardSub, { color: APP_CONFIG.accentColor }]}>{plan.sub}</Text>
+                          </View>
+                          <Text style={styles.cardPrice}>{displayPrice}</Text>
+                        </View>
+                      </Animated.View>
+                    </TouchableOpacity>
+                  );
+                }
+
+                return (
+                  <TouchableOpacity key={plan.id} onPress={() => setSelectedPlan(plan.id)} activeOpacity={0.8}>
+                    <View style={[styles.card, isSelected && { borderColor: APP_CONFIG.accentColor, backgroundColor: 'rgba(255,77,0,0.05)' }]}>
+                      <View style={styles.cardContent}>
+                        <View>
+                          <Text style={styles.cardTitleSmall}>{plan.title}</Text>
+                          <Text style={styles.cardSubSmall}>{plan.sub}</Text>
+                        </View>
+                        <Text style={styles.cardPriceSmall}>{displayPrice}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+
+          <TouchableOpacity onPress={handleContinue} disabled={isPurchasing || isLoading} style={styles.ctaButton}>
+            <LinearGradient colors={[APP_CONFIG.accentColor, '#CC3D00']} style={styles.ctaGradient}>
+              {isPurchasing ? <Loader2 size={24} color="#FFF" /> : <Text style={styles.ctaText}>{APP_CONFIG.ctaLabel}</Text>}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <Text style={styles.cancelNote}>Secured payment. Cancel anytime from App Store settings.</Text>
+
+          <View style={styles.footerRow}>
+            <TouchableOpacity onPress={handleRestore} disabled={isRestoring}>
+              <Text style={styles.footerLink}>{isRestoring ? 'Restoring...' : 'Restore Access'}</Text>
+            </TouchableOpacity>
+            <View style={styles.dot} />
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
+              <Text style={styles.footerLink}>Terms</Text>
+            </TouchableOpacity>
+            <View style={styles.dot} />
+            <TouchableOpacity onPress={() => Linking.openURL('https://semihtrn4.github.io/worldpulse_privacy/')}>
+              <Text style={styles.footerLink}>Privacy</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  containerTablet: {
-    paddingHorizontal: 48,
-    maxWidth: 900,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    marginTop: 10,
-    zIndex: 10,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-  },
-  closeIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  heroContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: HEADER_HEIGHT,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-  gradientOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: HEADER_HEIGHT * 0.7,
-  },
-  titleSection: {
-    marginTop: HEADER_HEIGHT - 120, // Push content up slightly into the gradient
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#FFF',
-    lineHeight: 48,
-    letterSpacing: -1,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
-  },
-  subtitle: {
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 16,
-    lineHeight: 24,
-    fontWeight: '500',
-  },
-  features: {
-    marginBottom: 40,
-    gap: 16,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  featureIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,215,0,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  featureText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFF',
-    flex: 1,
-  },
-  plansContainer: {
-    gap: 12,
-    marginBottom: 30,
-  },
-  planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  selectedPlanCard: {
-    backgroundColor: 'rgba(255,215,0,0.12)',
-    borderColor: '#FFD700',
-  },
-  planInfo: {
-    flex: 1,
-  },
-  planTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFF',
-  },
-  planPrice: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: 2,
-  },
-  planPeriod: {
-    fontSize: 13,
-  },
-  saveBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  saveBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#000',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedCheckbox: {
-    backgroundColor: '#FFD700',
-    borderColor: '#FFD700',
-  },
-  continueButton: {
-    backgroundColor: '#FFD700',
-    paddingVertical: 20,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  continueButtonText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000',
-    letterSpacing: 2,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 30,
-    gap: 8,
-  },
-  footerLink: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '600',
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  disclaimer: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.3)',
-    textAlign: 'center',
-    marginTop: 12,
-  }
+  mainContainer: { flex: 1 },
+  safeArea: { flex: 1 },
+  scrollContent: { padding: 20, paddingTop: 30, paddingBottom: 60 },
+  tabletScroll: { maxWidth: 600, alignSelf: 'center', width: '100%' },
+  header: { marginBottom: 20 },
+  closeBtn: { alignSelf: 'flex-start', padding: 10, marginLeft: -10 },
+  titleGroup: { alignItems: 'center', marginTop: 5 },
+  headline: { color: '#FFF', fontSize: 28, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 },
+  subtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', marginTop: 4, fontWeight: '500' },
+  counterRow: { alignItems: 'center', marginVertical: 12 },
+  counterBadge: { backgroundColor: 'rgba(255,77,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,77,0,0.3)', paddingHorizontal: 16, paddingVertical: 5, borderRadius: 20 },
+  counterText: { color: '#FF4D00', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  
+  visualBox: { height: 250, backgroundColor: '#000', borderRadius: 24, overflow: 'hidden', marginBottom: 25, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', position: 'relative', justifyContent: 'center' },
+  worldImage: { ...StyleSheet.absoluteFillObject, opacity: 0.7 },
+  
+  scanLine: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: '#FF4D00', opacity: 0.4, shadowColor: '#FF4D00', shadowRadius: 10, shadowOpacity: 1 },
+  activeTag: { position: 'absolute', bottom: 15, left: 15, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(255,77,0,0.3)' },
+  pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF4D00' },
+  activeTagText: { color: '#FF4D00', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  
+  benefitsContainer: { marginBottom: 20, gap: 10 },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  benefitIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,77,0,0.1)', justifyContent: 'center', alignItems: 'center' },
+  benefitText: { color: '#CCC', fontSize: 14, fontWeight: '600' },
+  plansContainer: { gap: 10, marginBottom: 25 },
+  loadingPrices: { padding: 40, alignItems: 'center', gap: 12 },
+  loadingText: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
+  card: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 16 },
+  annualCard: { borderWidth: 2, paddingTop: 28 },
+  annualBadge: { position: 'absolute', top: 0, left: 0, right: 0, height: 24, borderTopLeftRadius: 15, borderTopRightRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  badgeText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardTitle: { color: '#FFF', fontSize: 17, fontWeight: '800' },
+  cardSub: { fontSize: 11, marginTop: 2, fontWeight: '700' },
+  cardPrice: { color: '#FFF', fontSize: 22, fontWeight: '900' },
+  cardTitleSmall: { color: 'rgba(255,255,255,0.6)', fontSize: 15, fontWeight: '700' },
+  cardSubSmall: { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 1 },
+  cardPriceSmall: { color: 'rgba(255,255,255,0.8)', fontSize: 18, fontWeight: '800' },
+  ctaButton: { borderRadius: 20, overflow: 'hidden', marginBottom: 12 },
+  ctaGradient: { paddingVertical: 18, alignItems: 'center' },
+  ctaText: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  cancelNote: { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'center', marginBottom: 20 },
+  footerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
+  footerLink: { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '600' },
+  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.08)' },
 });

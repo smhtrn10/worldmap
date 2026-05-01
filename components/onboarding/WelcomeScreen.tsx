@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Globe, Zap, Shield } from 'lucide-react-native';
@@ -206,7 +207,10 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
 
           {/* Main Logo/Emoji */}
           <View style={styles.logoContainer}>
-            <Text style={styles.logoEmoji}>🌍</Text>
+            <Image 
+              source={require('@/assets/images/maskot.jpg')} 
+              style={styles.mascotImage} 
+            />
             <View style={styles.pulseRing} />
           </View>
         </LinearGradient>
@@ -332,11 +336,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoEmoji: {
-    fontSize: 120,
-    textShadowColor: 'rgba(0,255,100,0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 30,
+  mascotImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 2,
+    borderColor: 'rgba(0,255,100,0.4)',
   },
   pulseRing: {
     position: 'absolute',

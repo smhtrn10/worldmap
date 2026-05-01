@@ -80,29 +80,8 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleResetOnboarding = async () => {
-    Alert.alert(
-      '🔄 Reset Onboarding',
-      'This will restart the onboarding flow. This is a dev feature.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await AsyncStorage.multiRemove([
-                '@worldpulse_onboarding_completed',
-                '@worldpulse_paywall_shown'
-              ]);
-              Alert.alert('✅ Success', 'Onboarding reset! Restart the app to see it again.');
-            } catch (error) {
-              Alert.alert('❌ Error', 'Failed to reset onboarding');
-            }
-          }
-        }
-      ]
-    );
+  const handleTestOnboarding = () => {
+    router.push('/onboarding' as any);
   };
 
   const handleResetProStatus = async () => {
@@ -308,15 +287,15 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <Pressable
               style={[styles.sourceRow, styles.sourceRowBorder]}
-              onPress={handleResetOnboarding}
+              onPress={handleTestOnboarding}
             >
               <View style={styles.settingLeft}>
                 <View style={[styles.iconContainer, { backgroundColor: '#FFA50020' }]}>
-                  <Text style={styles.icon}>🔄</Text>
+                  <Text style={styles.icon}>▶️</Text>
                 </View>
                 <View>
-                  <Text style={styles.sourceName}>Reset Onboarding</Text>
-                  <Text style={styles.sourceUrl}>Restart the welcome flow</Text>
+                  <Text style={styles.sourceName}>Test Onboarding</Text>
+                  <Text style={styles.sourceUrl}>Start the onboarding flow</Text>
                 </View>
               </View>
               <Text style={styles.externalLink}>→</Text>

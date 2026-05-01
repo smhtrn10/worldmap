@@ -9,6 +9,8 @@ const STORAGE_PRO_STATUS = '@worldpulse_is_pro_status';
 
 let initPromise: Promise<void> | null = null;
 let isInitialized = false;
+let customerInfoListener: (() => void) | null = null;
+let onCustomerInfoUpdate: ((isPro: boolean, plan: string) => void) | null = null;
 
 export const RevenueCatService = {
   /**
@@ -28,8 +30,26 @@ export const RevenueCatService = {
         // iPadOS 26 fix: Wrap configure in try-catch for beta compatibility
         try {
           Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-          Purchases.configure({ apiKey: API_KEY_IOS });
+          Purchases.configure({ 
+            apiKey: API_KEY_IOS
+          });
+          isInitialized = true;
           console.log('[RevenueCat] SDK Initialized for iOS/iPadOS');
+
+          // KATEGORİ 6: CustomerInfo Listener kurulumu
+          Purchases.addCustomerInfoUpdateListener((info) => {
+            const isPro = typeof info.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+            const plan = this.getPlanType(info.activeSubscriptions);
+            
+            // Local cache güncelle
+            void AsyncStorage.setItem(STORAGE_PRO_STATUS, JSON.stringify(isPro));
+            
+            // Kayıtlı callback varsa tetikle
+            if (onCustomerInfoUpdate) {
+              onCustomerInfoUpdate(isPro, plan);
+            }
+          });
+
         } catch (configError) {
           console.error('[RevenueCat] Configuration failed:', configError);
           throw configError;
@@ -79,6 +99,29 @@ export const RevenueCatService = {
       const cached = await AsyncStorage.getItem(STORAGE_PRO_STATUS);
       return cached ? JSON.parse(cached) : false;
     }
+  },
+
+  /**
+   * KATEGORİ 3: Aktif aboneliklerden plan tipini belirler
+   */
+  getPlanType(activeSubscriptions: string[]): string {
+    if (activeSubscriptions.some(s => s.toLowerCase().includes('yearly') || s.toLowerCase().includes('annual'))) {
+      return 'yearly';
+    }
+    if (activeSubscriptions.some(s => s.toLowerCase().includes('monthly'))) {
+      return 'monthly';
+    }
+    if (activeSubscriptions.some(s => s.toLowerCase().includes('weekly'))) {
+      return 'weekly';
+    }
+    return 'free';
+  },
+
+  /**
+   * Dışarıdan listener bağlanmasını sağlar
+   */
+  setUpdateListener(callback: (isPro: boolean, plan: string) => void) {
+    onCustomerInfoUpdate = callback;
   },
 
   /**

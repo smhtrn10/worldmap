@@ -1,111 +1,50 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Animated, Dimensions, Easing } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width, height } = Dimensions.get('window');
 
 export function Slide3InstantAlerts() {
-  const [countdown, setCountdown] = React.useState(3);
-  const countScale = useRef(new Animated.Value(1)).current;
-  const ringScale = useRef(new Animated.Value(0.3)).current;
-  const ringOp = useRef(new Animated.Value(0.8)).current;
-  const bellShake = useRef(new Animated.Value(0)).current;
+  const player = useVideoPlayer(require('@/assets/images/4.mp4'), (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  const titleSlide = useRef(new Animated.Value(40)).current;
+  const titleOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const sequence = async () => {
-      for (let i = 3; i > 0; i--) {
-        setCountdown(i);
-        // Ring pulse
-        ringScale.setValue(0.3);
-        ringOp.setValue(0.8);
-        Animated.parallel([
-          Animated.spring(countScale, {
-            toValue: 1.3,
-            friction: 3,
-            tension: 120,
-            useNativeDriver: true,
-          }),
-          Animated.timing(ringScale, {
-            toValue: 2.2,
-            duration: 700,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(ringOp, {
-            toValue: 0,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-        ]).start(() => countScale.setValue(1));
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      // Bell shake
-      setCountdown(0);
-      Animated.sequence([
-        Animated.timing(bellShake, { toValue: -10, duration: 50, useNativeDriver: true }),
-        Animated.timing(bellShake, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(bellShake, { toValue: -10, duration: 100, useNativeDriver: true }),
-        Animated.timing(bellShake, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(bellShake, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]).start();
-    };
-
-    sequence();
+    Animated.parallel([
+      Animated.timing(titleSlide, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(titleOp, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   return (
     <View style={styles.container}>
       <View style={styles.sceneArea}>
-        {countdown > 0 ? (
-          <>
-            <Animated.View
-              style={[
-                styles.ring,
-                {
-                  opacity: ringOp,
-                  transform: [{ scale: ringScale }],
-                },
-              ]}
-            />
-            <Animated.Text
-              style={[
-                styles.countdownText,
-                { transform: [{ scale: countScale }] },
-              ]}
-            >
-              {countdown}
-            </Animated.Text>
-          </>
-        ) : (
-          <Animated.Text
-            style={[
-              styles.bellEmoji,
-              { transform: [{ rotate: bellShake.interpolate({
-                inputRange: [-10, 10],
-                outputRange: ['-15deg', '15deg'],
-              }) }] },
-            ]}
-          >
-            🔔
-          </Animated.Text>
-        )}
-
-        {/* Notification cards */}
-        <View style={[styles.notifCard, { top: '15%', left: '10%' }]}>
-          <Text style={styles.notifEmoji}>⚠️</Text>
-          <Text style={styles.notifText}>M6.2 Earthquake</Text>
-        </View>
-        <View style={[styles.notifCard, { top: '30%', right: '8%' }]}>
-          <Text style={styles.notifEmoji}>🔥</Text>
-          <Text style={styles.notifText}>Wildfire Alert</Text>
-        </View>
+        <VideoView
+          style={StyleSheet.absoluteFill}
+          player={player}
+          nativeControls={false}
+          contentFit="cover"
+        />
       </View>
 
       <View style={styles.socialBanner}>
         <Text style={styles.socialText}>⚡ Instant push notifications</Text>
       </View>
 
-      <View style={styles.content}>
+      <Animated.View style={[styles.content, { opacity: titleOp, transform: [{ translateY: titleSlide }] }]}>
         <Text style={styles.title}>Never Miss Critical Events</Text>
         <Text style={styles.subtitle}>
           Get instant alerts for earthquakes, disasters, and breaking news in your regions of interest.
@@ -127,7 +66,7 @@ export function Slide3InstantAlerts() {
             <Text style={styles.stepText}>Location-based</Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }

@@ -20,7 +20,6 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const [rcReady, setRcReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -33,13 +32,12 @@ export default function RootLayout() {
         console.log('[RootLayout] Onboarding complete:', isComplete);
         setOnboardingComplete(isComplete);
 
-        // iPadOS 26 fix: Handle initialization errors gracefully
-        await RevenueCatService.initialize();
+        // iPadOS 26 fix: Handle initialization errors gracefully (Run in background, don't await)
+        RevenueCatService.initialize().catch(err => console.error('[RootLayout] RevenueCat init failed:', err));
       } catch (error) {
-        console.error('[RootLayout] RevenueCat init failed:', error);
+        console.error('[RootLayout] setup failed:', error);
         // Continue anyway - app should work without RC
       } finally {
-        setRcReady(true);
         await SplashScreen.hideAsync();
       }
       
@@ -53,9 +51,9 @@ export default function RootLayout() {
     setup();
   }, []);
 
-  // iPadOS 26 fix: Show loading screen until RC is ready
-  if (!rcReady || onboardingComplete === null) {
-    console.log('[RootLayout] Loading... rcReady:', rcReady, 'onboardingComplete:', onboardingComplete);
+  // Show loading screen until onboarding status is loaded
+  if (onboardingComplete === null) {
+    console.log('[RootLayout] Loading... onboardingComplete:', onboardingComplete);
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
 

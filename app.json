@@ -15,11 +15,15 @@
       "backgroundColor": "#000000"
     },
     "ios": {
+      "appStoreUrl": "https://apps.apple.com/us/app/worldpulse-live-world-tracker/id6761394066",
       "supportsTablet": true,
       "bundleIdentifier": "com.worldpulse.mobile",
       "buildNumber": "1",
       "infoPlist": {
-        "UIDeviceFamily": [1, 2],
+        "UIDeviceFamily": [
+          1,
+          2
+        ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
           "NSExceptionDomains": {
@@ -87,7 +91,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

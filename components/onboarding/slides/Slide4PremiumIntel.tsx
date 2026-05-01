@@ -1,151 +1,50 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Animated, Dimensions, Easing } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width, height } = Dimensions.get('window');
 
 export function Slide4PremiumIntel() {
-  const [timeLeft, setTimeLeft] = React.useState({ m: 23, s: 59 });
-  const crownScale = useRef(new Animated.Value(0)).current;
-  const glowOp = useRef(new Animated.Value(0.3)).current;
-
-  // Stars burst
-  const stars = useRef(
-    Array.from({ length: 12 }, () => ({
-      x: new Animated.Value(0),
-      y: new Animated.Value(0),
-      op: new Animated.Value(0),
-      sc: new Animated.Value(0),
-    }))
-  ).current;
+  const player = useVideoPlayer(require('@/assets/images/5.mp4'), (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  const titleSlide = useRef(new Animated.Value(40)).current;
+  const titleOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Crown pop
-    Animated.spring(crownScale, {
-      toValue: 1,
-      friction: 4,
-      tension: 80,
-      delay: 200,
-      useNativeDriver: true,
-    }).start();
-
-    // Stars burst
-    Animated.parallel(
-      stars.map((s, i) => {
-        const angle = (i / stars.length) * Math.PI * 2;
-        const dist = 70 + Math.random() * 60;
-        return Animated.parallel([
-          Animated.timing(s.x, {
-            toValue: Math.cos(angle) * dist,
-            duration: 600,
-            delay: i * 30,
-            useNativeDriver: true,
-          }),
-          Animated.timing(s.y, {
-            toValue: Math.sin(angle) * dist,
-            duration: 600,
-            delay: i * 30,
-            useNativeDriver: true,
-          }),
-          Animated.timing(s.op, {
-            toValue: 1,
-            duration: 200,
-            delay: i * 30,
-            useNativeDriver: true,
-          }),
-          Animated.spring(s.sc, {
-            toValue: 1,
-            friction: 4,
-            tension: 100,
-            useNativeDriver: true,
-          }),
-        ]);
-      })
-    ).start();
-
-    // Glow loop
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowOp, {
-          toValue: 0.6,
-          duration: 1000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowOp, {
-          toValue: 0.3,
-          duration: 1000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Countdown timer
-    const interval = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t.s > 0) return { ...t, s: t.s - 1 };
-        if (t.m > 0) return { m: t.m - 1, s: 59 };
-        return t;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
+    Animated.parallel([
+      Animated.timing(titleSlide, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(titleOp, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
-
-  const timeStr = `${String(timeLeft.m).padStart(2, '0')}:${String(timeLeft.s).padStart(2, '0')}`;
 
   return (
     <View style={styles.container}>
       <View style={styles.sceneArea}>
-        {/* Glow */}
-        <Animated.View
-          style={[
-            styles.glow,
-            { opacity: glowOp },
-          ]}
+        <VideoView
+          style={StyleSheet.absoluteFill}
+          player={player}
+          nativeControls={false}
+          contentFit="cover"
         />
-
-        {/* Stars */}
-        {stars.map((s, i) => (
-          <Animated.Text
-            key={i}
-            style={[
-              styles.star,
-              {
-                opacity: s.op,
-                transform: [
-                  { translateX: s.x },
-                  { translateY: s.y },
-                  { scale: s.sc },
-                ],
-              },
-            ]}
-          >
-            {i % 2 === 0 ? '⭐' : '✨'}
-          </Animated.Text>
-        ))}
-
-        {/* Crown */}
-        <Animated.Text
-          style={[
-            styles.crownEmoji,
-            { transform: [{ scale: crownScale }] },
-          ]}
-        >
-          👑
-        </Animated.Text>
-
-        {/* Timer badge */}
-        <View style={styles.timerBadge}>
-          <Text style={styles.timerText}>⏰ {timeStr}</Text>
-        </View>
       </View>
 
       <View style={styles.socialBanner}>
         <Text style={styles.socialText}>🔥 Limited time offer — 40% OFF</Text>
       </View>
 
-      <View style={styles.content}>
+      <Animated.View style={[styles.content, { opacity: titleOp, transform: [{ translateY: titleSlide }] }]}>
         <Text style={styles.title}>Unlock Premium Intelligence</Text>
         <Text style={styles.subtitle}>
           Access restricted conflict zones, social unrest data, and advanced analytics.
@@ -164,7 +63,7 @@ export function Slide4PremiumIntel() {
             </View>
           ))}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }

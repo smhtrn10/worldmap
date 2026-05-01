@@ -1,5 +1,6 @@
 import * as StoreReview from 'expo-store-review';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 const STORAGE_KEYS = {
   REVIEW_REQUESTED: 'review_requested',
@@ -90,14 +91,15 @@ export class ReviewManager {
   }
 
   /**
-   * Uygulama açılış sayısını artırır
+   * Uygulama açılış sayısını artırır ve 3'ün katlarında değerlendirme sorar
    */
   static async incrementAppOpens(): Promise<void> {
     try {
       const current = await this.getAppOpens();
+      const newOpens = current + 1;
       await AsyncStorage.setItem(
         STORAGE_KEYS.APP_OPENS,
-        (current + 1).toString()
+        newOpens.toString()
       );
 
       // İlk açılış tarihini kaydet
@@ -108,9 +110,54 @@ export class ReviewManager {
           Date.now().toString()
         );
       }
+
+      // Kullanıcı zaten "Evet" demişse tekrar sorma
+      const hasRated = await AsyncStorage.getItem('user_has_rated_from_prompt');
+      if (hasRated === 'true') return;
+
+      // Her 3. girişte sor (3, 6, 9...)
+      if (newOpens > 0 && newOpens % 3 === 0) {
+        setTimeout(() => {
+          this.showRatePrompt();
+        }, 2000); // Uygulama açıldıktan 2 saniye sonra göster
+      }
     } catch (error) {
       console.error('Increment app opens error:', error);
     }
+  }
+
+  /**
+   * Özel Alert gösterir, kabul ederse StoreReview çalışır
+   */
+  static async showRatePrompt(): Promise<void> {
+    Alert.alert(
+      'Enjoying WorldPulse?',
+      'Would you like to rate us? Your feedback helps us improve the app.',
+      [
+        {
+          text: 'Maybe Later',
+          style: 'cancel',
+          onPress: () => console.log('User selected maybe later'),
+        },
+        {
+          text: 'Yes, Rate Now',
+          style: 'default',
+          onPress: async () => {
+            // Bir daha sormamak üzere kaydet
+            await AsyncStorage.setItem('user_has_rated_from_prompt', 'true');
+            // Yerel (native) değerlendirme penceresini çağır
+            try {
+              const isAvailable = await StoreReview.isAvailableAsync();
+              if (isAvailable || await StoreReview.hasAction()) {
+                await StoreReview.requestReview();
+              }
+            } catch (err) {
+              console.log('Error launching review prompt', err);
+            }
+          },
+        },
+      ]
+    );
   }
 
   /**
