@@ -18,7 +18,7 @@
       "appStoreUrl": "https://apps.apple.com/us/app/worldpulse-live-world-tracker/id6761394066",
       "supportsTablet": true,
       "bundleIdentifier": "com.worldpulse.mobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "UIDeviceFamily": [
           1,

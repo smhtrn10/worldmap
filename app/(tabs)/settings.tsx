@@ -36,8 +36,9 @@ const CATEGORIES: { key: EventCategory; filterKey: keyof FilterSettings }[] = [
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { filters, updateFilter, resetFilters, isPro } = useFilters();
+  const { filters, updateFilter, resetFilters, isPro, setIsPro } = useFilters();
   const deviceInfo = useDeviceType();
+  const [isRestoring, setIsRestoring] = React.useState(false);
   
   if (isPro === null) {
     return (
@@ -86,29 +87,45 @@ export default function SettingsScreen() {
 
   const handleResetProStatus = async () => {
     Alert.alert(
-      '🔓 Reset PRO Status',
-      'This will clear your PRO status cache and set you to FREE. This is a dev feature.',
+      '🔓 Toggle PRO Status (Dev Only)',
+      'Switch between FREE and PRO mode for testing.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reset to FREE',
-          style: 'destructive',
+          text: isPro ? 'Set to FREE' : 'Set to PRO',
+          style: isPro ? 'destructive' : 'default',
           onPress: async () => {
             try {
-              await AsyncStorage.multiRemove([
-                '@worldpulse_is_pro_status',
-                '@worldpulse_paywall_shown',
-                '@conflict_last_fetch',
-                '@conflict_cached_events'
-              ]);
-              Alert.alert('✅ Success', 'PRO status cleared! Restart the app to see FREE mode.');
+              const newStatus = !isPro;
+              await AsyncStorage.setItem('@worldpulse_is_pro_status', JSON.stringify(newStatus));
+              setIsPro(newStatus);
+              Alert.alert('✅ Success', `PRO status set to ${newStatus ? 'PRO' : 'FREE'}!`);
             } catch (error) {
-              Alert.alert('❌ Error', 'Failed to reset PRO status');
+              Alert.alert('❌ Error', 'Failed to toggle PRO status');
             }
           }
         }
       ]
     );
+  };
+
+  const handleRestorePurchases = async () => {
+    setIsRestoring(true);
+    try {
+      const { RevenueCatService } = await import('@/services/revenuecat');
+      const success = await RevenueCatService.restorePurchases();
+      setIsRestoring(false);
+      
+      if (success) {
+        setIsPro(true);
+        Alert.alert('✅ Success', 'Your purchases have been restored!');
+      } else {
+        Alert.alert('ℹ️ No Purchases Found', 'We couldn\'t find any previous purchases to restore.');
+      }
+    } catch (error) {
+      setIsRestoring(false);
+      Alert.alert('❌ Error', 'Failed to restore purchases. Please try again.');
+    }
   };
 
   return (
@@ -138,28 +155,40 @@ export default function SettingsScreen() {
       </View>
 
       {!isPro && (
-        <Pressable 
-          style={styles.upgradeBanner} 
-          onPress={() => router.push('/paywall' as any)}
-        >
-          <LinearGradient
-            colors={['#FFD700', '#FFA500']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.upgradeGradient}
+        <>
+          <Pressable 
+            style={styles.upgradeBanner} 
+            onPress={() => router.push('/paywall' as any)}
           >
-            <View style={styles.upgradeLeft}>
-              <View style={styles.upgradeIconContainer}>
-                <Star size={20} color="#000" fill="#000" />
+            <LinearGradient
+              colors={['#FFD700', '#FFA500']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.upgradeGradient}
+            >
+              <View style={styles.upgradeLeft}>
+                <View style={styles.upgradeIconContainer}>
+                  <Star size={20} color="#000" fill="#000" />
+                </View>
+                <View>
+                  <Text style={styles.upgradeTitle}>Upgrade to PRO</Text>
+                  <Text style={styles.upgradeSubtitle}>Unlock Conflict & Unrest Maps</Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.upgradeTitle}>Upgrade to PRO</Text>
-                <Text style={styles.upgradeSubtitle}>Unlock Conflict & Unrest Maps</Text>
-              </View>
-            </View>
-            <ChevronRight size={20} color="#000" />
-          </LinearGradient>
-        </Pressable>
+              <ChevronRight size={20} color="#000" />
+            </LinearGradient>
+          </Pressable>
+
+          <Pressable 
+            style={styles.restoreButton} 
+            onPress={handleRestorePurchases}
+            disabled={isRestoring}
+          >
+            <Text style={styles.restoreButtonText}>
+              {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+            </Text>
+          </Pressable>
+        </>
       )}
 
 
@@ -305,12 +334,14 @@ export default function SettingsScreen() {
               onPress={handleResetProStatus}
             >
               <View style={styles.settingLeft}>
-                <View style={[styles.iconContainer, { backgroundColor: '#FF6B6B20' }]}>
-                  <Text style={styles.icon}>🔓</Text>
+                <View style={[styles.iconContainer, { backgroundColor: isPro ? '#FF6B6B20' : '#00FF6420' }]}>
+                  <Text style={styles.icon}>{isPro ? '🔓' : '⭐'}</Text>
                 </View>
                 <View>
-                  <Text style={styles.sourceName}>Reset PRO Status</Text>
-                  <Text style={styles.sourceUrl}>Clear cache and set to FREE</Text>
+                  <Text style={styles.sourceName}>Toggle PRO Status</Text>
+                  <Text style={styles.sourceUrl}>
+                    {isPro ? 'Switch to FREE mode' : 'Switch to PRO mode'}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.externalLink}>→</Text>
@@ -547,7 +578,7 @@ const styles = StyleSheet.create({
   },
   upgradeBanner: {
     marginHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 12,
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 4,
@@ -555,6 +586,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  restoreButton: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    padding: 14,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  restoreButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.accent.primary,
   },
   upgradeGradient: {
     flexDirection: 'row',

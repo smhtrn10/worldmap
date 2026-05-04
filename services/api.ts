@@ -363,6 +363,51 @@ export async function fetchBBCNews(): Promise<WorldEvent[]> {
   }
 }
 
+// ── Al Jazeera News (Reuters yerine) ─────────────────────────────────────────
+export async function fetchAlJazeeraNews(): Promise<WorldEvent[]> {
+  const rssUrl = 'https://www.aljazeera.com/xml/rss/all.xml';
+
+  try {
+    if (IS_WEB) {
+      const proxies = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
+      ];
+      for (const proxyUrl of proxies) {
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 6000);
+          const res = await fetch(proxyUrl, { signal: controller.signal });
+          clearTimeout(tid);
+          if (!res.ok) continue;
+          const json = await res.json();
+          const xmlText = json.contents ?? json;
+          if (typeof xmlText !== 'string') continue;
+          const items = parseAlJazeeraXML(xmlText);
+          if (items.length === 0) continue;
+          return items;
+        } catch {
+          continue;
+        }
+      }
+      return [];
+    }
+
+    // Native (iOS / Android) — direkt fetch
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(rssUrl, { signal: controller.signal });
+    clearTimeout(tid);
+
+    if (!response.ok) throw new Error(`Al Jazeera RSS error: ${response.status}`);
+    const xmlText = await response.text();
+    return parseAlJazeeraXML(xmlText);
+  } catch (error) {
+    console.warn('[AlJazeera] fetch error:', error);
+    return [];
+  }
+}
+
 // ── Country geo lookup ────────────────────────────────────────────────────────
 const COUNTRY_GEO: Record<string, { lat: number; lng: number }> = {
   'ukraine':       { lat: 49.0, lng: 32.0 },
@@ -589,6 +634,35 @@ function parseBBCXML(xmlText: string): WorldEvent[] {
   }
 }
 
+function parseAlJazeeraXML(xmlText: string): WorldEvent[] {
+  try {
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+    const parsed = parser.parse(xmlText);
+    const items: any[] = parsed.rss?.channel?.item || [];
+    return items.slice(0, 20).map((item: any, index: number) => {
+      const title = item.title || 'Breaking News';
+      const description = typeof item.description === 'string'
+        ? item.description.replace(/<[^>]*>/g, '')
+        : '';
+      const coordinates = getNewsCoordinates(title, description);
+      return {
+        id:          `aljazeera-${index}-${Date.now()}`,
+        title,
+        description,
+        category:    'news' as EventCategory,
+        severity:    'medium' as EventSeverity,
+        coordinates,
+        timestamp:   new Date(item.pubDate || Date.now()),
+        source:      'aljazeera' as const,
+        sourceUrl:   item.link,
+        location:    'Global',
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 // ── NYT + Sky News RSS (GDELT endpoint öldü - 404) ───────────────────────────
 export async function fetchConflictEvents(): Promise<WorldEvent[]> {
   const feeds = [
@@ -616,17 +690,28 @@ export async function fetchConflictEvents(): Promise<WorldEvent[]> {
         const coords = getNewsCoordinates(title, desc);
         if (!coords) return;
         const text = (title + ' ' + desc).toLowerCase();
-        const isUnrest = ['protest','riot','demonstration','unrest','strike','violence','clash'].some(k => text.includes(k));
-        const isConflict = ['war','conflict','attack','killed','military','troops','missile','airstrike','bomb','battle','fighting'].some(k => text.includes(k));
         
-        if (!isUnrest && !isConflict) return;
+        // Better categorization logic - prioritize unrest keywords
+        const isUnrest = ['protest','riot','demonstration','unrest','strike','violence','clash','rally','march','uprising','revolt','civil disobedience'].some(k => text.includes(k));
+        const isConflict = ['war','conflict','attack','killed','military','troops','missile','airstrike','bomb','battle','fighting','invasion','combat','offensive'].some(k => text.includes(k));
         
-        const cat: EventCategory = isUnrest ? 'unrest' : 'conflict';
+        // If both are detected, prioritize unrest for civilian protests/riots
+        let category: EventCategory;
+        if (isUnrest && !text.includes('war') && !text.includes('military') && !text.includes('airstrike')) {
+          category = 'unrest';
+        } else if (isConflict) {
+          category = 'conflict';
+        } else if (isUnrest) {
+          category = 'unrest';
+        } else {
+          return; // Skip if neither
+        }
+        
         results.push({
           id:          `nyt-${index}-${Date.now()}`,
           title,
           description: desc,
-          category:    cat,
+          category,
           severity:    'medium',
           coordinates: coords,
           timestamp:   new Date(item.pubDate || Date.now()),
@@ -640,6 +725,68 @@ export async function fetchConflictEvents(): Promise<WorldEvent[]> {
 
   console.log('[GDELT] total conflict events:', results.length);
   return results;
+}
+
+// ── Defense News RSS (PRO only) ──────────────────────────────────────────────
+export async function fetchDefenseNews(): Promise<WorldEvent[]> {
+  const rssUrl = 'https://www.defensenews.com/arc/outboundfeeds/rss/';
+
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(rssUrl, { signal: controller.signal });
+    clearTimeout(tid);
+    
+    if (!res.ok) throw new Error(`Defense News RSS error: ${res.status}`);
+    const xmlText = await res.text();
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+    const parsed = parser.parse(xmlText);
+    const items: any[] = parsed.rss?.channel?.item || [];
+    
+    const results: WorldEvent[] = [];
+    
+    items.slice(0, 20).forEach((item: any, index: number) => {
+      const title = item.title || '';
+      const desc = typeof item.description === 'string'
+        ? item.description.replace(/<[^>]*>/g, '') : '';
+      const coords = getNewsCoordinates(title, desc);
+      if (!coords) return;
+      
+      const text = (title + ' ' + desc).toLowerCase();
+      
+      // Better categorization for Defense News
+      const isUnrest = ['protest','riot','demonstration','unrest','strike','civil','uprising','revolt','rally','march'].some(k => text.includes(k));
+      const isConflict = ['war','conflict','attack','killed','military','troops','missile','airstrike','bomb','battle','fighting','invasion','combat','offensive','defense','army','navy','air force'].some(k => text.includes(k));
+      
+      let category: EventCategory;
+      if (isUnrest && !text.includes('military') && !text.includes('war')) {
+        category = 'unrest';
+      } else if (isConflict || text.includes('defense') || text.includes('military')) {
+        category = 'conflict'; // Defense News is primarily military/conflict focused
+      } else {
+        category = 'conflict'; // Default for Defense News
+      }
+      
+      results.push({
+        id:          `defensenews-${index}-${Date.now()}`,
+        title,
+        description: desc,
+        category,
+        severity:    'medium',
+        coordinates: coords,
+        timestamp:   new Date(item.pubDate || Date.now()),
+        source:      'gdelt',
+        sourceUrl:   item.link,
+        location:    'Global',
+      });
+    });
+    
+    console.log('[DefenseNews] conflict events:', results.length);
+    return results;
+  } catch (error) {
+    console.warn('[DefenseNews] fetch error:', error);
+    return [];
+  }
 }
 
 function _processGDELT(
@@ -789,9 +936,34 @@ export async function fetchReliefWebConflicts(): Promise<WorldEvent[]> {
       const isUnrestTheme = themes.some(t => 
         t.toLowerCase().includes('rights') || 
         t.toLowerCase().includes('humanitarian') ||
-        f.title.toLowerCase().includes('protest') ||
-        f.title.toLowerCase().includes('unrest')
-      );
+        t.toLowerCase().includes('protection')
+      ) || f.title.toLowerCase().includes('protest') ||
+        f.title.toLowerCase().includes('unrest') ||
+        f.title.toLowerCase().includes('demonstration') ||
+        f.title.toLowerCase().includes('riot') ||
+        f.title.toLowerCase().includes('strike') ||
+        f.title.toLowerCase().includes('uprising') ||
+        f.title.toLowerCase().includes('civil disobedience');
+
+      const isConflictTheme = themes.some(t =>
+        t.toLowerCase().includes('conflict') ||
+        t.toLowerCase().includes('violence') ||
+        t.toLowerCase().includes('security')
+      ) || f.title.toLowerCase().includes('war') ||
+        f.title.toLowerCase().includes('military') ||
+        f.title.toLowerCase().includes('attack') ||
+        f.title.toLowerCase().includes('battle') ||
+        f.title.toLowerCase().includes('fighting');
+
+      // Prioritize unrest for civilian/rights issues
+      let category: EventCategory;
+      if (isUnrestTheme && !f.title.toLowerCase().includes('war') && !f.title.toLowerCase().includes('military')) {
+        category = 'unrest';
+      } else if (isConflictTheme) {
+        category = 'conflict';
+      } else {
+        category = 'conflict'; // Default for ReliefWeb
+      }
 
       events.push({
         id:          `reliefweb-${report.id}`,
@@ -817,33 +989,58 @@ export async function fetchReliefWebConflicts(): Promise<WorldEvent[]> {
 
 // ── Aggregate ────────────────────────────────────────────────────────────────
 export async function fetchAllEvents(isPro: boolean = false): Promise<WorldEvent[]> {
-  const [earthquakes, disasters, news, gdeltConflicts, gdacs, reliefwebConflicts, conflictIntel] =
-    await Promise.allSettled([
-      fetchEarthquakes().catch(e => { console.error('[API] fetchEarthquakes crashed:', e); return []; }),
-      fetchNaturalDisasters().catch(e => { console.error('[API] fetchNaturalDisasters crashed:', e); return []; }),
-      fetchBBCNews().catch(e => { console.error('[API] fetchBBCNews crashed:', e); return []; }),
-      fetchConflictEvents().catch(e => { console.error('[API] fetchConflictEvents crashed:', e); return []; }),
-      fetchGDACSEvents().catch(e => { console.error('[API] fetchGDACSEvents crashed:', e); return []; }),
-      fetchReliefWebConflicts().catch(e => { console.error('[API] fetchReliefWebConflicts crashed:', e); return []; }),
-      fetchConflictIntel(isPro).catch(e => { console.error('[API] fetchConflictIntel crashed:', e); return []; }),
-    ]);
+  // Base sources for all users
+  const baseSources = [
+    fetchEarthquakes().catch(e => { console.error('[API] fetchEarthquakes crashed:', e); return []; }),
+    fetchNaturalDisasters().catch(e => { console.error('[API] fetchNaturalDisasters crashed:', e); return []; }),
+    fetchBBCNews().catch(e => { console.error('[API] fetchBBCNews crashed:', e); return []; }),
+    fetchAlJazeeraNews().catch(e => { console.error('[API] fetchAlJazeeraNews crashed:', e); return []; }),
+    fetchGDACSEvents().catch(e => { console.error('[API] fetchGDACSEvents crashed:', e); return []; }),
+  ];
+
+  // PRO-only sources
+  const proSources = isPro ? [
+    fetchConflictEvents().catch(e => { console.error('[API] fetchConflictEvents crashed:', e); return []; }),
+    fetchReliefWebConflicts().catch(e => { console.error('[API] fetchReliefWebConflicts crashed:', e); return []; }),
+    fetchDefenseNews().catch(e => { console.error('[API] fetchDefenseNews crashed:', e); return []; }),
+    fetchConflictIntel(isPro).catch(e => { console.error('[API] fetchConflictIntel crashed:', e); return []; }),
+  ] : [];
+
+  const allSources = [...baseSources, ...proSources];
+  const results = await Promise.allSettled(allSources);
 
   const events: WorldEvent[] = [];
 
-  if (earthquakes.status === 'fulfilled')        { console.log('[API] earthquakes:', earthquakes.value.length);      events.push(...earthquakes.value); }
-  else console.error('[API] earthquakes failed:', earthquakes.reason);
-  if (disasters.status === 'fulfilled')          { console.log('[API] disasters:', disasters.value.length);          events.push(...disasters.value); }
-  else console.error('[API] disasters failed:', disasters.reason);
-  if (news.status === 'fulfilled')               { console.log('[API] news:', news.value.length);                    events.push(...news.value); }
-  else console.error('[API] news failed:', news.reason);
-  if (gdeltConflicts.status === 'fulfilled')     { console.log('[API] gdelt:', gdeltConflicts.value.length);         events.push(...gdeltConflicts.value); }
-  else console.error('[API] gdelt failed:', gdeltConflicts.reason);
-  if (gdacs.status === 'fulfilled')              { console.log('[API] gdacs:', gdacs.value.length);                  events.push(...gdacs.value); }
-  else console.error('[API] gdacs failed:', gdacs.reason);
-  if (reliefwebConflicts.status === 'fulfilled') { console.log('[API] reliefweb:', reliefwebConflicts.value.length); events.push(...reliefwebConflicts.value); }
-  else console.error('[API] reliefweb failed:', reliefwebConflicts.reason);
-  if (conflictIntel.status === 'fulfilled')      { console.log('[API] conflict-intel:', conflictIntel.value.length); events.push(...conflictIntel.value); }
-  else console.error('[API] conflict-intel failed:', conflictIntel.reason);
+  // Process base sources (indices 0-4)
+  if (results[0].status === 'fulfilled') { console.log('[API] earthquakes:', results[0].value.length); events.push(...results[0].value); }
+  else console.error('[API] earthquakes failed:', results[0].reason);
+  
+  if (results[1].status === 'fulfilled') { console.log('[API] disasters:', results[1].value.length); events.push(...results[1].value); }
+  else console.error('[API] disasters failed:', results[1].reason);
+  
+  if (results[2].status === 'fulfilled') { console.log('[API] bbc-news:', results[2].value.length); events.push(...results[2].value); }
+  else console.error('[API] bbc-news failed:', results[2].reason);
+  
+  if (results[3].status === 'fulfilled') { console.log('[API] aljazeera-news:', results[3].value.length); events.push(...results[3].value); }
+  else console.error('[API] aljazeera-news failed:', results[3].reason);
+  
+  if (results[4].status === 'fulfilled') { console.log('[API] gdacs:', results[4].value.length); events.push(...results[4].value); }
+  else console.error('[API] gdacs failed:', results[4].reason);
+
+  // Process PRO sources (indices 5-8) only if isPro
+  if (isPro) {
+    if (results[5].status === 'fulfilled') { console.log('[API] gdelt:', results[5].value.length); events.push(...results[5].value); }
+    else console.error('[API] gdelt failed:', results[5].reason);
+    
+    if (results[6].status === 'fulfilled') { console.log('[API] reliefweb:', results[6].value.length); events.push(...results[6].value); }
+    else console.error('[API] reliefweb failed:', results[6].reason);
+    
+    if (results[7].status === 'fulfilled') { console.log('[API] defense-news:', results[7].value.length); events.push(...results[7].value); }
+    else console.error('[API] defense-news failed:', results[7].reason);
+    
+    if (results[8].status === 'fulfilled') { console.log('[API] conflict-intel:', results[8].value.length); events.push(...results[8].value); }
+    else console.error('[API] conflict-intel failed:', results[8].reason);
+  }
 
   const seen = new Set<string>();
   const unique = events.filter((e) => {

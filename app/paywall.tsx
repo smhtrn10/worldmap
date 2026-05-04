@@ -10,6 +10,7 @@ import {
   Linking,
   Animated,
   Easing,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -176,9 +177,12 @@ export default function PaywallScreen() {
     const success = await RevenueCatService.restorePurchases();
     setIsRestoring(false);
     if (success) {
+      Alert.alert('Başarılı', 'Aboneliğin geri yüklendi!');
       setIsPro(true);
       void queryClient.invalidateQueries({ queryKey: ['all-events'] });
       router.back();
+    } else {
+      Alert.alert('Bulunamadı', 'Bu hesaba ait aktif abonelik yok.');
     }
   };
 
@@ -287,13 +291,19 @@ export default function PaywallScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
+          <TouchableOpacity 
+            onPress={handleRestore} 
+            disabled={isRestoring} 
+            style={styles.restoreButton}
+          >
+            <Text style={styles.restoreButtonText}>
+              {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+            </Text>
+          </TouchableOpacity>
+
           <Text style={styles.cancelNote}>Secured payment. Cancel anytime from App Store settings.</Text>
 
           <View style={styles.footerRow}>
-            <TouchableOpacity onPress={handleRestore} disabled={isRestoring}>
-              <Text style={styles.footerLink}>{isRestoring ? 'Restoring...' : 'Restore Access'}</Text>
-            </TouchableOpacity>
-            <View style={styles.dot} />
             <TouchableOpacity onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
               <Text style={styles.footerLink}>Terms</Text>
             </TouchableOpacity>
@@ -351,6 +361,21 @@ const styles = StyleSheet.create({
   ctaButton: { borderRadius: 20, overflow: 'hidden', marginBottom: 12 },
   ctaGradient: { paddingVertical: 18, alignItems: 'center' },
   ctaText: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  restoreButton: { 
+    borderRadius: 16, 
+    paddingVertical: 14, 
+    alignItems: 'center', 
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  restoreButtonText: { 
+    color: 'rgba(255,255,255,0.6)', 
+    fontSize: 15, 
+    fontWeight: '700', 
+    letterSpacing: 0.3 
+  },
   cancelNote: { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'center', marginBottom: 20 },
   footerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
   footerLink: { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '600' },

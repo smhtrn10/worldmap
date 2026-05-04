@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import Purchases, { LOG_LEVEL, PurchasesPackage } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL, PurchasesPackage, PURCHASES_ERROR_CODE } from 'react-native-purchases';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_KEY_IOS     = 'appl_kjhwQGJELRufkdnNhOJykEFLAdd';
@@ -9,7 +9,7 @@ const STORAGE_PRO_STATUS = '@worldpulse_is_pro_status';
 
 let initPromise: Promise<void> | null = null;
 let isInitialized = false;
-let customerInfoListener: (() => void) | null = null;
+let customerInfoListener: ((info: any) => void) | null = null;
 let onCustomerInfoUpdate: ((isPro: boolean, plan: string) => void) | null = null;
 
 export const RevenueCatService = {
@@ -31,14 +31,15 @@ export const RevenueCatService = {
         try {
           Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
           Purchases.configure({ 
-            apiKey: API_KEY_IOS
+            apiKey: API_KEY_IOS,
+            appUserID: null
           });
           isInitialized = true;
           console.log('[RevenueCat] SDK Initialized for iOS/iPadOS');
 
           // KATEGORİ 6: CustomerInfo Listener kurulumu
-          Purchases.addCustomerInfoUpdateListener((info) => {
-            const isPro = typeof info.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+          customerInfoListener = (info: any) => {
+            const isPro = ENTITLEMENT_ID in info.entitlements.active;
             const plan = this.getPlanType(info.activeSubscriptions);
             
             // Local cache güncelle
@@ -48,7 +49,8 @@ export const RevenueCatService = {
             if (onCustomerInfoUpdate) {
               onCustomerInfoUpdate(isPro, plan);
             }
-          });
+          };
+          Purchases.addCustomerInfoUpdateListener(customerInfoListener);
 
         } catch (configError) {
           console.error('[RevenueCat] Configuration failed:', configError);
@@ -90,7 +92,7 @@ export const RevenueCatService = {
     try {
       // iPadOS 26 fix: Wrap in try-catch for beta compatibility
       const customerInfo = await Purchases.getCustomerInfo();
-      const isActive = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      const isActive = ENTITLEMENT_ID in customerInfo.entitlements.active;
       await AsyncStorage.setItem(STORAGE_PRO_STATUS, JSON.stringify(isActive));
       return isActive;
     } catch (error) {
@@ -160,11 +162,13 @@ export const RevenueCatService = {
     if (Platform.OS !== 'ios') return false;
     try {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
-      const isPro = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      const isPro = ENTITLEMENT_ID in customerInfo.entitlements.active;
       await AsyncStorage.setItem(STORAGE_PRO_STATUS, JSON.stringify(isPro));
       return isPro;
     } catch (e: any) {
-      if (!e.userCancelled) {
+      if (e.userCancelled || e.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
+        console.log('[RevenueCat] User cancelled purchase');
+      } else {
         console.error('[RevenueCat] Purchase failed:', e);
       }
       return false;
@@ -178,12 +182,23 @@ export const RevenueCatService = {
     if (Platform.OS !== 'ios') return false;
     try {
       const customerInfo = await Purchases.restorePurchases();
-      const isPro = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      const isPro = ENTITLEMENT_ID in customerInfo.entitlements.active;
       await AsyncStorage.setItem(STORAGE_PRO_STATUS, JSON.stringify(isPro));
       return isPro;
     } catch (e) {
       console.error('[RevenueCat] Restore failed:', e);
       return false;
     }
+  },
+
+  /**
+   * Cleans up listeners
+   */
+  dispose() {
+    if (customerInfoListener) {
+      Purchases.removeCustomerInfoUpdateListener(customerInfoListener);
+    }
+    customerInfoListener = null;
+    isInitialized = false;
   }
 };

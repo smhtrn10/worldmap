@@ -7,7 +7,7 @@ export interface MapCoordinates {
   longitude: number;
 }
 
-export type EventSource = 'usgs' | 'eonet' | 'bbc' | 'gdelt' | 'acled' | 'gdacs';
+export type EventSource = 'usgs' | 'eonet' | 'bbc' | 'aljazeera' | 'gdelt' | 'acled' | 'gdacs' | 'reliefweb';
 
 export interface WorldEvent {
   id: string;

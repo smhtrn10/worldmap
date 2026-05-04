@@ -44,7 +44,7 @@ export function BottomFilterSheet({
   onToggleCategory,
   disabledCategories = []
 }: BottomFilterSheetProps) {
-  const { isPro } = useFilters();
+  const { isPro, filters } = useFilters();
   const slideAnim = useRef(new Animated.Value(500)).current;
 
   useEffect(() => {
@@ -78,7 +78,19 @@ export function BottomFilterSheet({
         <Text style={styles.title}>Filter Events</Text>
 
         {OPTIONS.map((opt) => {
-          const isSelected = selectedCategories.includes(opt.category);
+          // Use settings filters to determine if category is active
+          let isSelected = false;
+          switch (opt.category) {
+            case 'earthquake': isSelected = filters.showEarthquakes; break;
+            case 'wildfire': isSelected = filters.showWildfires; break;
+            case 'flood': isSelected = filters.showFloods; break;
+            case 'volcano': isSelected = filters.showVolcanoes; break;
+            case 'storm': isSelected = filters.showStorms; break;
+            case 'news': isSelected = filters.showNews; break;
+            case 'conflict': isSelected = filters.showConflicts; break;
+            case 'unrest': isSelected = filters.showUnrest; break;
+          }
+          
           const isLocked = isPro === false && (opt.category === 'conflict' || opt.category === 'unrest');
           const isDisabled = disabledCategories.includes(opt.category);
           

@@ -43,6 +43,8 @@ export default function OnboardingScreen() {
   const handleComplete = async () => {
     try {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      // Mark that paywall has been shown (from onboarding)
+      await AsyncStorage.setItem('@worldpulse_paywall_shown', 'true');
       // Navigate to paywall after onboarding
       router.replace('/paywall' as any);
     } catch (error) {

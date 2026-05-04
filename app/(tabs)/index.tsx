@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { StyleSheet, View, Text, Platform, Pressable, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
 import { fetchAllEvents } from '@/services/api';
 import { useFilters } from '@/context/FilterContext';
-import { useFilteredEvents } from '@/hooks/useFilteredEvents';
 import { RefreshFAB } from '@/components/RefreshFAB';
 import { BottomFilterSheet } from '@/components/BottomFilterSheet';
 import { useDeviceType } from '@/hooks/useDeviceType';
@@ -36,15 +35,21 @@ const CATEGORY_LEGEND: { category: EventCategory; color: string; label: string }
 export default function MapScreen() {
   const router = useRouter();
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const { filters, isPro } = useFilters();
+  const { filters, isPro, updateFilter } = useFilters();
   const deviceInfo = useDeviceType();
 
-  // Show paywall modal on first launch after onboarding
+  // Show paywall modal on first launch after onboarding (if user closed it without purchasing)
   useEffect(() => {
     const checkFirstLaunch = async () => {
       try {
         const hasSeenPaywall = await AsyncStorage.getItem('@worldpulse_paywall_shown');
-        if (!hasSeenPaywall && isPro === false) {
+        const onboardingComplete = await AsyncStorage.getItem('@worldpulse_onboarding_completed');
+        
+        // Only show paywall if:
+        // 1. User has completed onboarding
+        // 2. User hasn't seen paywall yet
+        // 3. User is not pro
+        if (onboardingComplete === 'true' && !hasSeenPaywall && isPro === false) {
           await AsyncStorage.setItem('@worldpulse_paywall_shown', 'true');
           // Small delay to let the app settle
           setTimeout(() => {
@@ -64,10 +69,65 @@ export default function MapScreen() {
   // All hooks must be called before any early return
   const disabledCategories: EventCategory[] = isPro ? [] : ['conflict', 'unrest'];
 
-  const [selectedCategories, setSelectedCategories] = useState<EventCategory[]>(() => {
-    const base: EventCategory[] = ['earthquake', 'wildfire', 'flood', 'volcano', 'storm', 'news'];
-    return base; // start with base; conflict/unrest added via effect when isPro resolves
-  });
+  const [selectedCategories, setSelectedCategories] = useState<EventCategory[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+
+  // Load selected categories from AsyncStorage on mount
+  useEffect(() => {
+    const loadSelectedCategories = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@worldpulse_selected_categories');
+        if (stored) {
+          const parsed: EventCategory[] = JSON.parse(stored);
+          setSelectedCategories(parsed);
+        } else {
+          // Initialize from filters (settings)
+          const base: EventCategory[] = [];
+          if (filters.showEarthquakes) base.push('earthquake');
+          if (filters.showWildfires) base.push('wildfire');
+          if (filters.showFloods) base.push('flood');
+          if (filters.showVolcanoes) base.push('volcano');
+          if (filters.showStorms) base.push('storm');
+          if (filters.showNews) base.push('news');
+          if (filters.showConflicts) base.push('conflict');
+          if (filters.showUnrest) base.push('unrest');
+          setSelectedCategories(base);
+          // Save initial state
+          await AsyncStorage.setItem('@worldpulse_selected_categories', JSON.stringify(base));
+        }
+      } catch (error) {
+        console.error('Error loading selected categories:', error);
+        // Fallback to defaults
+        const base: EventCategory[] = ['earthquake', 'wildfire', 'flood', 'volcano', 'storm', 'news'];
+        setSelectedCategories(base);
+      } finally {
+        setCategoriesLoaded(true);
+      }
+    };
+    loadSelectedCategories();
+  }, [filters]);
+
+  // Sync selectedCategories when settings filters change
+  useEffect(() => {
+    if (!categoriesLoaded) return;
+    
+    const syncFromFilters = async () => {
+      const base: EventCategory[] = [];
+      if (filters.showEarthquakes) base.push('earthquake');
+      if (filters.showWildfires) base.push('wildfire');
+      if (filters.showFloods) base.push('flood');
+      if (filters.showVolcanoes) base.push('volcano');
+      if (filters.showStorms) base.push('storm');
+      if (filters.showNews) base.push('news');
+      if (filters.showConflicts) base.push('conflict');
+      if (filters.showUnrest) base.push('unrest');
+      
+      setSelectedCategories(base);
+      await AsyncStorage.setItem('@worldpulse_selected_categories', JSON.stringify(base));
+    };
+    
+    syncFromFilters();
+  }, [filters, categoriesLoaded]);
 
   const { data: events = [], isLoading, refetch } = useQuery({
     queryKey: ['all-events', isPro],
@@ -76,31 +136,114 @@ export default function MapScreen() {
     enabled: isPro !== null, // don't fetch until PRO status is known
   });
 
-  const filteredEvents = useFilteredEvents(events, filters, isPro ?? false);
+  // Apply only magnitude filter and PRO restrictions, not category filters
+  const filteredByMagnitude = useMemo(() => {
+    return events.filter((event) => {
+      // Non-PRO users never see real conflict/unrest
+      if (!isPro && (event.category === 'conflict' || event.category === 'unrest')) {
+        return false;
+      }
+      // Only apply magnitude filter for earthquakes
+      if (event.category === 'earthquake' && event.magnitude && event.magnitude < filters.minMagnitude) {
+        return false;
+      }
+      return true;
+    });
+  }, [events, filters.minMagnitude, isPro]);
 
-  // When isPro resolves from null → true, add conflict/unrest to selected categories
+  // When isPro resolves from null → true, add conflict/unrest to selected categories if not already there
   React.useEffect(() => {
-    if (isPro === true) {
+    if (isPro === true && categoriesLoaded) {
       setSelectedCategories((prev) => {
         const proCategories: EventCategory[] = ['conflict', 'unrest'];
         const missing = proCategories.filter((c) => !prev.includes(c));
-        return missing.length > 0 ? [...missing, ...prev] : prev;
+        if (missing.length > 0) {
+          const updated = [...missing, ...prev];
+          // Save to AsyncStorage
+          AsyncStorage.setItem('@worldpulse_selected_categories', JSON.stringify(updated)).catch(console.error);
+          return updated;
+        }
+        return prev;
       });
     }
-  }, [isPro]);
+  }, [isPro, categoriesLoaded]);
 
-  const visibleEvents = filteredEvents.filter(
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const EVENTS_PER_PAGE = 30;
+
+  // Apply category filter based on selectedCategories (map toggles)
+  const allVisibleEvents = filteredByMagnitude.filter(
     (e) => selectedCategories.includes(e.category) && e.coordinates !== null
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(allVisibleEvents.length / EVENTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE;
+  const endIndex = startIndex + EVENTS_PER_PAGE;
+  const visibleEvents = allVisibleEvents.slice(startIndex, endIndex);
+
+  // Reset to page 1 when categories change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategories]);
+
+  const handlePrevPage = useCallback(() => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  }, []);
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  }, [totalPages]);
+
+  const handleLatestPage = useCallback(() => {
+    setCurrentPage(1);
+  }, []);
 
   const handleToggleCategory = useCallback((category: EventCategory) => {
     if (isPro === false && (category === 'conflict' || category === 'unrest')) {
       return;
     }
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
-    );
-  }, [isPro]);
+    setSelectedCategories((prev) => {
+      const updated = prev.includes(category) 
+        ? prev.filter((c) => c !== category) 
+        : [...prev, category];
+      
+      // Save to AsyncStorage
+      AsyncStorage.setItem('@worldpulse_selected_categories', JSON.stringify(updated)).catch(console.error);
+      
+      // Sync with settings filters
+      const isEnabled = updated.includes(category);
+      switch (category) {
+        case 'earthquake':
+          updateFilter('showEarthquakes', isEnabled);
+          break;
+        case 'wildfire':
+          updateFilter('showWildfires', isEnabled);
+          break;
+        case 'flood':
+          updateFilter('showFloods', isEnabled);
+          break;
+        case 'volcano':
+          updateFilter('showVolcanoes', isEnabled);
+          break;
+        case 'storm':
+          updateFilter('showStorms', isEnabled);
+          break;
+        case 'news':
+          updateFilter('showNews', isEnabled);
+          break;
+        case 'conflict':
+          updateFilter('showConflicts', isEnabled);
+          break;
+        case 'unrest':
+          updateFilter('showUnrest', isEnabled);
+          break;
+      }
+      
+      return updated;
+    });
+  }, [isPro, updateFilter]);
 
   const handleMarkerPress = useCallback((_id: string) => {
     // Panel WorldMapNative içinde handle ediliyor
@@ -176,6 +319,41 @@ export default function MapScreen() {
       </View>
 
       <RefreshFAB onRefresh={refetch} isLoading={isLoading} />
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <View style={[
+          styles.paginationContainer,
+          deviceInfo.type === 'tablet' && styles.paginationContainerTablet
+        ]}>
+          <Pressable 
+            style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+            onPress={handlePrevPage}
+            disabled={currentPage === 1}
+          >
+            <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>←</Text>
+          </Pressable>
+          
+          <View style={styles.paginationInfo}>
+            <Text style={styles.paginationText}>{currentPage}/{totalPages}</Text>
+            <Text style={styles.paginationSubtext}>{allVisibleEvents.length} events</Text>
+          </View>
+          
+          <Pressable 
+            style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+            onPress={handleNextPage}
+            disabled={currentPage === totalPages}
+          >
+            <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>→</Text>
+          </Pressable>
+          
+          {currentPage > 1 && (
+            <Pressable style={styles.latestButton} onPress={handleLatestPage}>
+              <Text style={styles.latestButtonText}>LATEST</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <BottomFilterSheet
         isVisible={filterSheetVisible}
@@ -256,5 +434,79 @@ const styles = StyleSheet.create({
   filterButtonTextTablet: {
     fontSize: 14,
     letterSpacing: 1.5,
+  },
+  paginationContainer: {
+    position: 'absolute',
+    top: 52,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,100,0.3)',
+  },
+  paginationContainerTablet: {
+    top: 60,
+    right: 32,
+    padding: 12,
+    gap: 12,
+  },
+  paginationButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,255,100,0.15)',
+    borderWidth: 1,
+    borderColor: '#00FF64',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  paginationButtonText: {
+    color: '#00FF64',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  paginationButtonTextDisabled: {
+    color: 'rgba(255,255,255,0.3)',
+  },
+  paginationInfo: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  paginationText: {
+    color: '#00FF64',
+    fontSize: 13,
+    fontWeight: '800',
+    fontFamily: MONO,
+    letterSpacing: 1,
+  },
+  paginationSubtext: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 9,
+    fontWeight: '600',
+    fontFamily: MONO,
+    marginTop: 2,
+  },
+  latestButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#FF4D00',
+    borderWidth: 1,
+    borderColor: '#FF6B00',
+  },
+  latestButtonText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: MONO,
   },
 });

@@ -10,7 +10,7 @@ export default function TabLayout() {
   const { isPro, isLoading: isProLoading } = useFilters();
   const { data: events } = useQuery({
     queryKey: ['all-events', isPro],
-    queryFn: () => fetchAllEvents(isPro),
+    queryFn: () => fetchAllEvents(isPro ?? false),
     // K5: isPro cache'den okunana kadar query başlatma
     enabled: !isProLoading,
     refetchInterval: 5 * 60 * 1000,

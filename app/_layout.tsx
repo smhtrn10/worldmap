@@ -32,8 +32,8 @@ export default function RootLayout() {
         console.log('[RootLayout] Onboarding complete:', isComplete);
         setOnboardingComplete(isComplete);
 
-        // iPadOS 26 fix: Handle initialization errors gracefully (Run in background, don't await)
-        RevenueCatService.initialize().catch(err => console.error('[RootLayout] RevenueCat init failed:', err));
+        // iPadOS 26 fix: Handle initialization errors gracefully
+        await RevenueCatService.initialize().catch(err => console.error('[RootLayout] RevenueCat init failed:', err));
       } catch (error) {
         console.error('[RootLayout] setup failed:', error);
         // Continue anyway - app should work without RC
